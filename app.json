@@ -23,14 +23,6 @@
       },
       "package": "com.lukeholder.uksalarytax"
     },
-    "plugins": [
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX",
-          "iosAppId": "ca-app-pub-XXXXXXXXXXXXXXXX~XXXXXXXXXX"
-        }
-      ]
-    ]
+    "plugins": []
   }
 }

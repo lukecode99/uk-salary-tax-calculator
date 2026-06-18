@@ -1,46 +1,20 @@
 import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
-import { colors } from '../theme';
+import { View, Text, StyleSheet } from 'react-native';
 
-// AdMob unit IDs — replace with real IDs before publishing
-// Use test IDs during development
-const AD_UNIT_ID = Platform.select({
-  ios: 'ca-app-pub-3940256099942544/2934735716',     // test ID
-  android: 'ca-app-pub-3940256099942544/6300978111', // test ID
-  default: '',
-});
-
-let BannerAd: React.ComponentType<any> | null = null;
-let BannerAdSize: any = null;
-
-try {
-  const admob = require('react-native-google-mobile-ads');
-  BannerAd = admob.BannerAd;
-  BannerAdSize = admob.BannerAdSize;
-} catch {
-  // AdMob not available in Expo Go — renders empty slot
-}
-
+// AdMob is enabled in production builds only (EAS Build with react-native-google-mobile-ads).
+// In Expo Go this renders a placeholder slot.
 export function AdBanner() {
-  return (
-    <View style={styles.container}>
-      {BannerAd && BannerAdSize ? (
-        <BannerAd
-          unitId={AD_UNIT_ID}
-          size={BannerAdSize.BANNER}
-          requestOptions={{ requestNonPersonalizedAdsOnly: false }}
-        />
-      ) : null}
-    </View>
-  );
+  return <View style={styles.container}><Text style={styles.text}>Ad</Text></View>;
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#1A1A1A',
     alignItems: 'center',
+    justifyContent: 'center',
     borderTopWidth: 1,
-    borderTopColor: colors.border,
-    minHeight: 50,
+    borderTopColor: '#2A2A2A',
+    height: 50,
   },
+  text: { color: '#333', fontSize: 11, letterSpacing: 0.08, textTransform: 'uppercase' },
 });

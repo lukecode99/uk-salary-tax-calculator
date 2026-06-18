@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>UK Salary & Tax Calculator 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0A0A0A;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+.phone {
+  width: 390px;
+  min-height: 100vh;
+  background: #0D0D0D;
+  display: flex;
+  flex-direction: column;
+}
+.status-bar {
+  background: #0D0D0D;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #CCCCCC;
+}
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 130px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFFFFF;
+  text-align: center;
+  padding: 8px 0 4px;
+  letter-spacing: -0.3px;
+}
+.title span { color: #BAFF29; }
+.card {
+  background: #1A1A1A;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.salary-row { display: flex; align-items: center; gap: 10px; }
+.salary-label { font-size: 15px; color: #666; width: 36px; }
+.salary-input {
+  flex: 1;
+  background: #242424;
+  color: #FFFFFF;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+}
+.salary-input:focus { border-color: #BAFF29; }
+.salary-input::placeholder { color: #444; }
+.salary-input.alt { background: #1F1F1F; }
+.period-selector {
+  display: flex;
+  background: #242424;
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.period-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.period-btn.active {
+  background: #BAFF29;
+  color: #0D0D0D;
+  font-weight: 700;
+}
+.section-title { font-size: 17px; font-weight: 700; color: #FFFFFF; }
+.divider { height: 1px; background: #2A2A2A; }
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+}
+.result-row.bold .r-label,
+.result-row.bold .r-value { font-weight: 700; font-size: 17px; }
+.result-row.accent .r-value { color: #BAFF29; }
+.result-row.dimmed .r-label,
+.result-row.dimmed .r-value { color: #444; font-size: 13px; }
+.result-row.indent { padding-left: 16px; }
+.r-label { font-size: 15px; color: #999; flex: 1; }
+.r-value { font-size: 15px; color: #FFFFFF; text-align: right; min-width: 110px; }
+.expand-btn {
+  background: none;
+  border: none;
+  color: #BAFF29;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 0;
+  text-align: left;
+}
+.pension-box {
+  background: #111;
+  border: 1px solid #2A2A2A;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.ad-banner {
+  position: fixed;
+  bottom: 60px;
+  width: 390px;
+  background: #1A1A1A;
+  border-top: 1px solid #2A2A2A;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #333;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  width: 390px;
+  background: #0D0D0D;
+  border-top: 1px solid #2A2A2A;
+  display: flex;
+  height: 60px;
+}
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 10px;
+  color: #444;
+  gap: 3px;
+}
+.tab-btn.active { color: #BAFF29; }
+.tab-icon { font-size: 20px; }
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+.toggle-label { font-size: 15px; color: #CCCCCC; }
+.toggle {
+  width: 48px; height: 28px;
+  background: #2A2A2A;
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: #BAFF29; }
+.toggle::after {
+  content: '';
+  position: absolute;
+  width: 20px; height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  top: 4px; left: 4px;
+  transition: left 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+}
+.toggle.on::after { left: 24px; background: #0D0D0D; }
+.help-text { font-size: 13px; color: #666; line-height: 20px; }
+.help-heading { font-size: 15px; font-weight: 700; color: #FFFFFF; margin-bottom: 6px; }
+.help-section { margin-bottom: 16px; }
+.num-input {
+  background: #242424;
+  color: #FFFFFF;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: right;
+  width: 70px;
+  outline: none;
+}
+.num-input:focus { border-color: #BAFF29; }
+.suffix { color: #666; font-size: 15px; margin-left: 6px; }
+@media (max-width: 420px) {
+  .phone, .tab-bar, .ad-banner { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="status-bar">
+    <span style="flex:1">9:41</span>
+    <span>▐▐▐ 🔋</span>
+  </div>
+
+  <!-- MAIN -->
+  <div class="content" id="mainContent" style="display:flex;flex-direction:column">
+    <div class="title">UK Salary &amp; Tax<br><span>Calculator 2026</span></div>
+    <div class="card">
+      <div class="salary-row">
+        <span class="salary-label">New</span>
+        <input class="salary-input" id="newSalary" type="number" placeholder="0.00" oninput="recalc()">
+      </div>
+      <div class="salary-row">
+        <span class="salary-label">Old</span>
+        <input class="salary-input alt" id="oldSalary" type="number" placeholder="Optional" oninput="recalc()">
+      </div>
+      <div class="period-selector" id="inputPeriod">
+        <button class="period-btn active" onclick="setPeriod('input','annual',this)">Annual</button>
+        <button class="period-btn" onclick="setPeriod('input','monthly',this)">Monthly</button>
+        <button class="period-btn" onclick="setPeriod('input','weekly',this)">Weekly</button>
+        <button class="period-btn" onclick="setPeriod('input','daily',this)">Daily</button>
+        <button class="period-btn" onclick="setPeriod('input','hourly',this)">Hourly</button>
+      </div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none">
+      <div class="section-title">Results</div>
+      <div class="period-selector" id="resultPeriod">
+        <button class="period-btn" onclick="setPeriod('result','annual',this)">Annual</button>
+        <button class="period-btn active" onclick="setPeriod('result','monthly',this)">Monthly</button>
+        <button class="period-btn" onclick="setPeriod('result','weekly',this)">Weekly</button>
+        <button class="period-btn" onclick="setPeriod('result','daily',this)">Daily</button>
+        <button class="period-btn" onclick="setPeriod('result','hourly',this)">Hourly</button>
+      </div>
+      <div class="divider"></div>
+      <div id="resultsBody"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="content" id="settingsContent" style="display:none;flex-direction:column">
+    <div class="title">Settings</div>
+    <div class="card">
+      <div class="toggle-row">
+        <span class="toggle-label">Pension contribution</span>
+        <div style="display:flex;align-items:center">
+          <input class="num-input" id="pensionPct" type="number" value="5" min="0" max="100" oninput="recalc()">
+          <span class="suffix">%</span>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <span class="toggle-label">Scottish tax rates</span>
+        <div class="toggle" id="scottishToggle" onclick="toggleSetting('scottish')"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <span class="toggle-label">National Insurance</span>
+        <div class="toggle on" id="niToggle" onclick="toggleSetting('ni')"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row">
+        <span class="toggle-label">Age group</span>
+        <div class="period-selector">
+          <button class="period-btn active" onclick="setAge('under65',this)" style="padding:5px 8px">&lt;65</button>
+          <button class="period-btn" onclick="setAge('65to74',this)" style="padding:5px 8px">65–74</button>
+          <button class="period-btn" onclick="setAge('over75',this)" style="padding:5px 8px">75+</button>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="toggle-row" style="flex-wrap:wrap;gap:8px">
+        <span class="toggle-label">Student loan</span>
+        <div class="period-selector">
+          <button class="period-btn active" onclick="setLoan('none',this)" style="padding:5px 6px">None</button>
+          <button class="period-btn" onclick="setLoan('plan1',this)" style="padding:5px 6px">Plan 1</button>
+          <button class="period-btn" onclick="setLoan('plan2',this)" style="padding:5px 6px">Plan 2</button>
+          <button class="period-btn" onclick="setLoan('plan4',this)" style="padding:5px 6px">Plan 4</button>
+          <button class="period-btn" onclick="setLoan('plan5',this)" style="padding:5px 6px">Plan 5</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HELP -->
+  <div class="content" id="helpContent" style="display:none;flex-direction:column">
+    <div class="title">Help</div>
+    <div class="card">
+      <div class="help-section">
+        <div class="help-heading">Tax Year 2025/26</div>
+        <div class="help-text">Uses 2025/26 UK rates for England, Wales, NI and Scotland. Indicative only — consult a professional for tax returns.</div>
+      </div>
+      <div class="divider"></div>
+      <div class="help-section" style="margin-top:14px">
+        <div class="help-heading">Income Tax</div>
+        <div class="help-text">Personal allowance: £12,570<br>Basic rate (20%): up to £50,270<br>Higher rate (40%): £50,271–£125,140<br>Additional rate (45%): above £125,140<br>Allowance tapers above £100,000</div>
+      </div>
+      <div class="divider"></div>
+      <div class="help-section" style="margin-top:14px">
+        <div class="help-heading">Pension Relief</div>
+        <div class="help-text">Contributions reduce taxable income.<br><br><b style="color:#CCCCCC">Auto relief:</b> 20% basic rate saving applied automatically.<br><br><b style="color:#CCCCCC">Self-assessment:</b> higher/additional rate taxpayers reclaim the extra via their tax return.</div>
+      </div>
+      <div class="divider"></div>
+      <div class="help-section" style="margin-top:14px">
+        <div class="help-heading">National Insurance</div>
+        <div class="help-text">8% on earnings £12,570–£50,270<br>2% above £50,270 · No NI at 65+</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ad-banner">Advertisement</div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-main" onclick="showTab('main')">
+      <span class="tab-icon">🧮</span><span>Calculator</span>
+    </button>
+    <button class="tab-btn" id="tab-settings" onclick="showTab('settings')">
+      <span class="tab-icon">⚙️</span><span>Settings</span>
+    </button>
+    <button class="tab-btn" id="tab-help" onclick="showTab('help')">
+      <span class="tab-icon">❓</span><span>Help</span>
+    </button>
+  </div>
+</div>
+
+<script>
+const cfg={pensionPct:5,scottish:false,ni:true,age:'under65',loan:'none'};
+let inP='annual',resP='monthly',showPen=false;
+function calcPA(g){return g<=100000?12570:Math.max(0,12570-Math.floor((g-100000)/2));}
+function calcTaxEng(t){
+  if(t<=0)return 0;if(t<=37700)return t*.2;
+  if(t<=112570)return 37700*.2+(t-37700)*.4;
+  return 37700*.2+74870*.4+(t-112570)*.45;
+}
+function calcTaxScot(g,pa){
+  return[[12570,14876,.19],[14876,26561,.2],[26561,43662,.21],[43662,75000,.42],[75000,125140,.45],[125140,1e9,.48]]
+    .reduce((s,[f,t,r])=>{const v=Math.min(g,t)-Math.max(pa,f);return s+(v>0?v*r:0);},0);
+}
+function calcNI(g){
+  if(!cfg.ni||cfg.age!=='under65'||g<=12570)return 0;
+  return g<=50270?(g-12570)*.08:(50270-12570)*.08+(g-50270)*.02;
+}
+function calcLoan(g){
+  const th={plan1:24990,plan2:27295,plan4:31395,plan5:25000,postgrad:21000},
+        rt={plan1:.09,plan2:.09,plan4:.09,plan5:.09,postgrad:.06};
+  if(cfg.loan==='none'||g<=th[cfg.loan])return 0;
+  return(g-th[cfg.loan])*rt[cfg.loan];
+}
+function marg(t,g){
+  if(cfg.scottish){if(g>125140)return.48;if(g>75000)return.45;if(g>43662)return.42;if(g>26561)return.21;if(g>14876)return.2;return.19;}
+  if(t>112570)return.45;if(t>37700)return.4;return.2;
+}
+function calcAll(g){
+  const pa=calcPA(g),pen=g*(cfg.pensionPct/100),adj=g-pen,t=Math.max(0,adj-pa);
+  const tax=cfg.scottish?calcTaxScot(adj,pa):calcTaxEng(t),ni=calcNI(g),loan=calcLoan(g),mr=marg(t,g);
+  const auto=pen*.2,sa=pen*Math.max(0,mr-.2);
+  return{gross:g,pen,taxable:t,tax,ni,loan,take:g-pen-tax-ni-loan,auto,sa,eff:pen-auto-sa,mr};
+}
+function toAnn(v,p){return v*({annual:1,monthly:12,weekly:52,daily:260,hourly:1950}[p]||1);}
+function sc(r,p){const f=({annual:1,monthly:1/12,weekly:1/52,daily:1/260,hourly:1/1950}[p]||1);
+  return{gross:r.gross*f,pen:r.pen*f,taxable:r.taxable*f,tax:r.tax*f,ni:r.ni*f,loan:r.loan*f,
+    take:r.take*f,auto:r.auto*f,sa:r.sa*f,eff:r.eff*f,mr:r.mr};}
+function fmt(n){const a=Math.abs(n);return(n<0?'-':'')+'£'+a.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function row(l,v,c=''){return`<div class="result-row ${c}"><span class="r-label">${l}</span><span class="r-value">${fmt(v)}</span></div>`;}
+function recalc(){
+  const nv=parseFloat(document.getElementById('newSalary').value),ov=parseFloat(document.getElementById('oldSalary').value);
+  cfg.pensionPct=parseFloat(document.getElementById('pensionPct').value)||0;
+  if(!nv||isNaN(nv)){document.getElementById('resultsCard').style.display='none';return;}
+  const nR=sc(calcAll(toAnn(nv,inP)),resP),oR=isNaN(ov)?null:sc(calcAll(toAnn(ov,inP)),resP);
+  document.getElementById('resultsCard').style.display='flex';
+  const pd=showPen?`<div class="pension-box">
+    ${row('Your contribution',nR.pen,'dimmed indent')}
+    ${row('Auto tax relief (20%)',nR.auto,'dimmed indent')}
+    ${nR.sa>0.005?row('Claim via self-assessment',nR.sa,'dimmed indent'):''}
+    ${row('Effective pension cost',nR.eff,'indent')}
+  </div>`:'';
+  document.getElementById('resultsBody').innerHTML=`
+    ${oR?row('Gross Salary Change',nR.gross-oR.gross,'bold'):row('Gross Salary',nR.gross)}
+    ${row('Pension',nR.pen)}
+    <button class="expand-btn" onclick="togglePen()">${showPen?'▲ Hide pension detail':'▼ Pension detail'}</button>
+    ${pd}
+    ${row('Taxable Income',nR.taxable)}
+    ${row('Income Tax',nR.tax)}
+    ${row('National Insurance',nR.ni)}
+    ${nR.loan>0.005?row('Student Loan',nR.loan):''}
+    <div class="divider"></div>
+    ${oR?row('Take Home Change',nR.take-oR.take,'bold accent'):row('Take Home',nR.take,'bold accent')}
+  `;
+}
+function togglePen(){showPen=!showPen;recalc();}
+function setPeriod(t,v,btn){
+  const id=t==='input'?'inputPeriod':'resultPeriod';
+  document.querySelectorAll('#'+id+' .period-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');if(t==='input')inP=v;else resP=v;recalc();
+}
+function toggleSetting(k){
+  if(k==='scottish'){cfg.scottish=!cfg.scottish;document.getElementById('scottishToggle').classList.toggle('on',cfg.scottish);}
+  else{cfg.ni=!cfg.ni;document.getElementById('niToggle').classList.toggle('on',cfg.ni);}recalc();
+}
+function setAge(v,btn){cfg.age=v;document.querySelectorAll('[onclick^="setAge"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');recalc();}
+function setLoan(v,btn){cfg.loan=v;document.querySelectorAll('[onclick^="setLoan"]').forEach(b=>b.classList.remove('active'));btn.classList.add('active');recalc();}
+function showTab(t){
+  ['main','settings','help'].forEach(x=>{const el=document.getElementById(x+'Content');
+    el.style.display=x===t?'flex':'none';if(x===t)el.style.flexDirection='column';});
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+}
+</script>
+</body>
+</html>
