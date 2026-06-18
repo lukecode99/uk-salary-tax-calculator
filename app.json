@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#2563EB"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lukeholder.uksalarytax"
@@ -24,8 +26,17 @@
       "package": "com.lukeholder.uksalarytax"
     },
     "plugins": [],
-    "experiments": {
-      "baseUrl": "/uk-salary-tax-calculator"
-    }
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0668c343-a6f4-44dc-b52b-becc4a639ba4"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0668c343-a6f4-44dc-b52b-becc4a639ba4"
+      }
+    },
+    "owner": "lukeholder-nano"
   }
 }

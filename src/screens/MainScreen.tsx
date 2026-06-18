@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet,
   TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
@@ -7,48 +7,64 @@ import { calculate, toPeriodResult, TaxResult, Period } from '../engine/taxEngin
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
 import { AdBanner } from '../components/AdBanner';
-import { AppSettings, DEFAULT_SETTINGS } from '../types';
+import { AppSettings, PensionMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
+  newSalary: string;
+  setNewSalary: (v: string) => void;
+  oldSalary: string;
+  setOldSalary: (v: string) => void;
+  inputPeriod: Period;
+  setInputPeriod: (p: Period) => void;
   settings: AppSettings;
 }
 
 function toAnnual(value: number, period: Period, hours: number, days: number): number {
-  const WEEKS = 52;
+  const W = 52;
   switch (period) {
     case 'annual': return value;
     case 'monthly': return value * 12;
-    case 'weekly': return value * WEEKS;
-    case 'daily': return value * WEEKS * days;
-    case 'hourly': return value * WEEKS * hours;
+    case 'weekly': return value * W;
+    case 'daily': return value * W * days;
+    case 'hourly': return value * W * hours;
   }
 }
 
-export function MainScreen({ settings }: Props) {
-  const [newSalary, setNewSalary] = useState('');
-  const [oldSalary, setOldSalary] = useState('');
-  const [inputPeriod, setInputPeriod] = useState<Period>('annual');
-  const [resultPeriod, setResultPeriod] = useState<Period>('monthly');
-  const [showPension, setShowPension] = useState(false);
+function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): number {
+  return mode === 'percent' ? grossSalary * (value / 100) : value;
+}
+
+export function MainScreen({
+  newSalary, setNewSalary, oldSalary, setOldSalary,
+  inputPeriod, setInputPeriod, settings,
+}: Props) {
+  const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
+  const [showPension, setShowPension] = React.useState(false);
 
   const newAnnual = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
     if (isNaN(v) || v < 0) return null;
     return toAnnual(v, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek);
-  }, [newSalary, inputPeriod, settings]);
+  }, [newSalary, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek]);
 
   const oldAnnual = useMemo(() => {
     const v = parseFloat(oldSalary.replace(/,/g, ''));
     if (isNaN(v) || v < 0) return null;
     return toAnnual(v, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek);
-  }, [oldSalary, inputPeriod, settings]);
+  }, [oldSalary, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek]);
+
+  function getPayeContrib(annualGross: number): number {
+    const p = settings.pension;
+    if (!p.payeEnabled) return 0;
+    return pensionAnnual(annualGross, p.payeEmployeeMode, p.payeEmployeeValue);
+  }
 
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
       grossSalary: newAnnual,
-      pensionPercent: settings.pensionPercent,
+      payeContrib: getPayeContrib(newAnnual),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -63,7 +79,7 @@ export function MainScreen({ settings }: Props) {
     if (oldAnnual === null) return null;
     const annual = calculate({
       grossSalary: oldAnnual,
-      pensionPercent: settings.pensionPercent,
+      payeContrib: getPayeContrib(oldAnnual),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -82,6 +98,7 @@ export function MainScreen({ settings }: Props) {
   }
 
   const current = newResult?.[resultPeriod];
+  const hasOld = !!oldResult;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -89,38 +106,38 @@ export function MainScreen({ settings }: Props) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-
-          {/* Title */}
-          <Text style={styles.title}>UK Salary & Tax Calculator 2026</Text>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Text style={styles.title}>UK Salary & Tax{'\n'}Calculator 2026</Text>
 
           {/* Salary inputs */}
           <View style={styles.card}>
-            <View style={styles.salaryRow}>
-              <Text style={styles.salaryLabel}>New</Text>
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>New</Text>
               <TextInput
-                style={styles.salaryInput}
+                style={styles.input}
                 keyboardType="decimal-pad"
                 placeholder="0.00"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textMuted}
                 value={newSalary}
                 onChangeText={setNewSalary}
               />
             </View>
-            <View style={styles.salaryRow}>
-              <Text style={styles.salaryLabel}>Old</Text>
+            <View style={styles.inputRow}>
+              <Text style={styles.inputLabel}>Old</Text>
               <TextInput
-                style={[styles.salaryInput, styles.salaryInputAlt]}
+                style={[styles.input, styles.inputAlt]}
                 keyboardType="decimal-pad"
                 placeholder="Optional"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textMuted}
                 value={oldSalary}
                 onChangeText={setOldSalary}
               />
             </View>
-            <View style={styles.periodRow}>
-              <PeriodSelector value={inputPeriod} onChange={setInputPeriod} />
-            </View>
+            <PeriodSelector value={inputPeriod} onChange={setInputPeriod} />
           </View>
 
           {/* Results */}
@@ -128,57 +145,31 @@ export function MainScreen({ settings }: Props) {
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Results</Text>
               <PeriodSelector value={resultPeriod} onChange={setResultPeriod} />
-
               <View style={styles.divider} />
 
-              <ResultRow
-                label="Gross Salary"
-                value={current.grossSalary}
-                bold={!oldResult}
-              />
-              {oldResult && (
-                <ResultRow
-                  label="Gross Salary Change"
-                  value={diff('grossSalary')!}
-                  bold
-                />
+              <ResultRow label="Gross Salary" value={current.grossSalary} bold={!hasOld} />
+              {hasOld && (
+                <ResultRow label="Gross Change" value={diff('grossSalary')!} bold />
               )}
 
-              <ResultRow label="Pension" value={current.pension.grossContribution} />
-
-              {/* Pension detail toggle */}
-              <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
-                <Text style={styles.expandLink}>{showPension ? '▲ Hide pension detail' : '▼ Pension detail'}</Text>
-              </TouchableOpacity>
-
-              {showPension && (
-                <View style={styles.pensionBox}>
-                  <ResultRow
-                    label="Your contribution"
-                    value={current.pension.employeeCost}
-                    indent
-                    dimmed
-                  />
-                  <ResultRow
-                    label="Auto tax relief (20%)"
-                    value={current.pension.autoRelief}
-                    indent
-                    dimmed
-                  />
-                  {current.pension.selfAssessmentClaim > 0 && (
-                    <ResultRow
-                      label="Claim via self-assessment"
-                      value={current.pension.selfAssessmentClaim}
-                      indent
-                      dimmed
-                    />
+              {current.pension.employeeContrib > 0 && (
+                <>
+                  <ResultRow label="Pension" value={current.pension.employeeContrib} />
+                  <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
+                    <Text style={styles.expandLink}>
+                      {showPension ? '▲ Hide detail' : '▼ Pension detail'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showPension && (
+                    <View style={styles.pensionBox}>
+                      <ResultRow label="Auto tax saving (20%)" value={current.pension.autoTaxSaving} indent dimmed />
+                      {current.pension.selfAssessmentClaim > 0 && (
+                        <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
+                      )}
+                      <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
+                    </View>
                   )}
-                  <ResultRow
-                    label="Effective pension cost"
-                    value={current.pension.effectiveCost}
-                    indent
-                  />
-                </View>
+                </>
               )}
 
               <ResultRow label="Taxable Income" value={current.taxableIncome} />
@@ -190,14 +181,13 @@ export function MainScreen({ settings }: Props) {
 
               <View style={styles.divider} />
               <ResultRow
-                label="Take Home"
-                value={oldResult ? diff('takeHome')! : current.takeHome}
+                label={hasOld ? 'Take Home Change' : 'Take Home'}
+                value={hasOld ? diff('takeHome')! : current.takeHome}
                 bold
                 accent
               />
             </View>
           )}
-
         </ScrollView>
       </KeyboardAvoidingView>
       <AdBanner />
@@ -212,48 +202,44 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl },
   title: {
     fontSize: font.sizes.xl,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.text,
     textAlign: 'center',
     paddingVertical: spacing.sm,
+    lineHeight: 28,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
     gap: spacing.sm,
   },
-  salaryRow: {
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  salaryLabel: {
-    fontSize: font.sizes.md,
+  inputLabel: {
+    fontSize: font.sizes.sm,
+    fontWeight: '600',
     color: colors.textSecondary,
-    width: 36,
+    width: 30,
+    flexShrink: 0,
   },
-  salaryInput: {
+  input: {
     flex: 1,
-    backgroundColor: colors.text,
-    color: '#FFFFFF',
+    backgroundColor: colors.inputBg,
+    color: colors.inputText,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     fontSize: font.sizes.lg,
     fontWeight: '600',
     textAlign: 'right',
+    minWidth: 0,
   },
-  salaryInputAlt: {
-    backgroundColor: '#1E293B',
-  },
-  periodRow: {
-    marginTop: spacing.xs,
+  inputAlt: {
+    backgroundColor: '#1E1E1E',
   },
   sectionTitle: {
     fontSize: font.sizes.lg,
@@ -271,7 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
   },
   pensionBox: {
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,

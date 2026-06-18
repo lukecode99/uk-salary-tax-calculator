@@ -33,7 +33,7 @@ export function HelpScreen() {
           <View style={styles.divider} />
 
           <Section title="National Insurance">
-            {`Class 1 employee contributions:\n• 8% on earnings £12,570–£50,270\n• 2% above £50,270\n• No NI for those aged 65 or over`}
+            {`Class 1 employee contributions:\n• 8% on earnings £12,570–£50,270\n• 2% above £50,270\n• No NI from State Pension Age (currently 66)`}
           </Section>
 
           <View style={styles.divider} />

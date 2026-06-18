@@ -38,7 +38,7 @@ export function PeriodSelector({ value, onChange }: Props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: colors.border,
+    backgroundColor: colors.surface2,
     borderRadius: radius.pill,
     padding: 3,
     gap: 2,
@@ -50,12 +50,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pillActive: {
-    backgroundColor: colors.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: colors.primary,
   },
   label: {
     fontSize: font.sizes.xs,
@@ -63,7 +58,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   labelActive: {
-    color: colors.primary,
-    fontWeight: '600',
+    color: '#000000',
+    fontWeight: '700',
   },
 });

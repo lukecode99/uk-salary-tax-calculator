@@ -1,21 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainScreen } from './src/screens/MainScreen';
+import { PensionScreen } from './src/screens/PensionScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { HelpScreen } from './src/screens/HelpScreen';
-import { AppSettings, DEFAULT_SETTINGS } from './src/types';
+import { AppSettings, DEFAULT_SETTINGS, PensionMode } from './src/types';
+import { Period } from './src/engine/taxEngine';
 import { colors } from './src/theme';
-
-// Simple icon text until vector icons are wired up
-function TabIcon({ icon }: { icon: string }) {
-  return null; // replaced by label only until icons added
-}
 
 const Tab = createBottomTabNavigator();
 
+function toAnnual(value: number, period: Period, hours: number, days: number): number {
+  const W = 52;
+  switch (period) {
+    case 'annual': return value;
+    case 'monthly': return value * 12;
+    case 'weekly': return value * W;
+    case 'daily': return value * W * days;
+    case 'hourly': return value * W * hours;
+  }
+}
+
+function pensionAnnual(gross: number, mode: PensionMode, value: number): number {
+  return mode === 'percent' ? gross * (value / 100) : value;
+}
+
 export default function App() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [newSalary, setNewSalary] = useState('');
+  const [oldSalary, setOldSalary] = useState('');
+  const [inputPeriod, setInputPeriod] = useState<Period>('annual');
+
+  const annualSalary = useMemo(() => {
+    const v = parseFloat(newSalary.replace(/,/g, ''));
+    if (isNaN(v) || v < 0) return 0;
+    return toAnnual(v, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek);
+  }, [newSalary, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek]);
 
   return (
     <NavigationContainer>
@@ -23,21 +44,39 @@ export default function App() {
         screenOptions={{
           tabBarActiveTintColor: colors.tabBarActive,
           tabBarInactiveTintColor: colors.tabBarInactive,
-          tabBarStyle: { backgroundColor: colors.tabBar, borderTopColor: colors.border },
+          tabBarStyle: {
+            backgroundColor: colors.tabBar,
+            borderTopColor: colors.tabBarBorder,
+          },
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
           headerShown: false,
         }}
       >
-        <Tab.Screen
-          name="Main"
-          options={{ tabBarLabel: 'Calculator' }}
-        >
-          {() => <MainScreen settings={settings} />}
+        <Tab.Screen name="Calculator" options={{ tabBarLabel: 'Calculator' }}>
+          {() => (
+            <MainScreen
+              newSalary={newSalary}
+              setNewSalary={setNewSalary}
+              oldSalary={oldSalary}
+              setOldSalary={setOldSalary}
+              inputPeriod={inputPeriod}
+              setInputPeriod={setInputPeriod}
+              settings={settings}
+            />
+          )}
         </Tab.Screen>
 
-        <Tab.Screen
-          name="Settings"
-          options={{ tabBarLabel: 'Settings' }}
-        >
+        <Tab.Screen name="Pension" options={{ tabBarLabel: 'Pension' }}>
+          {() => (
+            <PensionScreen
+              annualSalary={annualSalary}
+              settings={settings}
+              onSettingsChange={setSettings}
+            />
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen name="Settings" options={{ tabBarLabel: 'Settings' }}>
           {() => <SettingsScreen settings={settings} onChange={setSettings} />}
         </Tab.Screen>
 
