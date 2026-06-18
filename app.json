@@ -23,6 +23,9 @@
       },
       "package": "com.lukeholder.uksalarytax"
     },
-    "plugins": []
+    "plugins": [],
+    "experiments": {
+      "baseUrl": "/uk-salary-tax-calculator"
+    }
   }
 }
