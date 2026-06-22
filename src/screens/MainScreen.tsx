@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet,
-  TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
+  SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { calculate, toPeriodResult, TaxResult, Period } from '../engine/taxEngine';
 import { PeriodSelector } from '../components/PeriodSelector';
@@ -42,7 +42,6 @@ export function MainScreen({
   inputPeriod, setInputPeriod, settings,
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
-  const [showPension, setShowPension] = React.useState(false);
 
   const newAnnual = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
@@ -167,20 +166,16 @@ export function MainScreen({
               {current.pension.employeeContrib > 0 && (
                 <>
                   <ResultRow label="Workplace Pension" value={-current.pension.employeeContrib} />
-                  <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
-                    <Text style={styles.expandLink}>
-                      {showPension ? '▲ Hide detail' : '▼ Pension detail'}
-                    </Text>
-                  </TouchableOpacity>
-                  {showPension && (
-                    <View style={styles.pensionBox}>
-                      <ResultRow label="Auto tax saving" value={current.pension.autoTaxSaving} indent dimmed />
-                      {current.pension.selfAssessmentClaim > 0 && (
-                        <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
-                      )}
-                      <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
+                  <View style={styles.pensionBox}>
+                    <View style={styles.pensionRow}>
+                      <Text style={styles.pensionLabel}>Auto tax saving</Text>
+                      <Text style={styles.pensionValue}>{formatCurrency(current.pension.autoTaxSaving)}</Text>
                     </View>
-                  )}
+                    <View style={styles.pensionRow}>
+                      <Text style={[styles.pensionLabel, styles.pensionLabelBold]}>Net pension cost</Text>
+                      <Text style={[styles.pensionValue, styles.pensionValueBold]}>{formatCurrency(current.pension.effectiveCost)}</Text>
+                    </View>
+                  </View>
                 </>
               )}
 
@@ -273,15 +268,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: spacing.xs,
   },
-  expandLink: {
-    color: colors.primary,
-    fontSize: font.sizes.sm,
-    paddingVertical: spacing.xs,
-  },
   pensionBox: {
     backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.xs,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  pensionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  pensionLabel: {
+    fontSize: font.sizes.sm,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  pensionLabelBold: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+  pensionValue: {
+    fontSize: font.sizes.sm,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  pensionValueBold: {
+    color: colors.text,
+    fontWeight: '700',
   },
 });
