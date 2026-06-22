@@ -166,7 +166,7 @@ export function MainScreen({
 
               {current.pension.employeeContrib > 0 && (
                 <>
-                  <ResultRow label="Workplace Pension" value={current.pension.employeeContrib} />
+                  <ResultRow label="Workplace Pension" value={-current.pension.employeeContrib} />
                   <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
                     <Text style={styles.expandLink}>
                       {showPension ? '▲ Hide detail' : '▼ Pension detail'}
@@ -202,7 +202,7 @@ export function MainScreen({
               {current.privatePension > 0 && (
                 <>
                   <View style={styles.divider} />
-                  <ResultRow label="Private Pension" value={current.privatePension} />
+                  <ResultRow label="Private Pension" value={-current.privatePension} />
                 </>
               )}
               {current.adjustedNetIncome !== current.grossSalary && (
