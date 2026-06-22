@@ -22,18 +22,51 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Patch metro exports (fix src/lib subpath access for RN build scripts)
+      - name: Patch metro exports (fix src/lib subpath for RN build scripts)
         run: |
           node -e "
             const path = require.resolve('metro/package.json');
             const pkg = JSON.parse(require('fs').readFileSync(path, 'utf8'));
-            pkg.exports['./src/lib/*'] = './src/lib/*.js';
-            require('fs').writeFileSync(path, JSON.stringify(pkg));
-            console.log('metro exports patched');
+            if (!pkg.exports['./src/lib/*']) {
+              pkg.exports['./src/lib/*'] = './src/lib/*.js';
+              require('fs').writeFileSync(path, JSON.stringify(pkg));
+              console.log('metro exports patched');
+            } else {
+              console.log('metro exports already patched');
+            }
           "
 
+      - name: Create getUserState shim (Expo SDK @expo/config missing export fix)
+        run: |
+          node << 'EOF'
+          const path = require('path');
+          const fs = require('fs');
+          try {
+            const configDir = path.dirname(require.resolve('@expo/config/package.json'));
+            const shimPath = path.join(configDir, 'build', 'getUserState.js');
+            if (!fs.existsSync(shimPath)) {
+              fs.mkdirSync(path.dirname(shimPath), { recursive: true });
+              fs.writeFileSync(shimPath, [
+                '"use strict";',
+                'Object.defineProperty(exports, "__esModule", { value: true });',
+                'exports.getUserState = getUserState;',
+                'const path = require("path");',
+                'const os = require("os");',
+                'function getUserState(filename) {',
+                '  return path.join(os.homedir(), ".expo", filename || "state.json");',
+                '}'
+              ].join('\n'));
+              console.log('getUserState shim created at', shimPath);
+            } else {
+              console.log('getUserState already exists');
+            }
+          } catch(e) {
+            console.log('Shim setup skipped:', e.message);
+          }
+          EOF
+
       - name: Prebuild iOS native project
-        run: npx expo prebuild --platform ios --clean --non-interactive --no-install
+        run: CI=1 npx expo prebuild --platform ios --clean --no-install
 
       - name: Install CocoaPods
         run: cd ios && pod install --repo-update
@@ -67,9 +100,12 @@ jobs:
         run: |
           XCWORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -type d | head -1)
           echo "Workspace: $XCWORKSPACE"
+          # Auto-detect scheme from workspace
+          SCHEME=$(xcodebuild -list -workspace "$XCWORKSPACE" 2>/dev/null | awk '/Schemes:/{found=1; next} found && /^[[:space:]]+[^[:space:]]/{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit}')
+          echo "Detected scheme: $SCHEME"
           xcodebuild archive \
             -workspace "$XCWORKSPACE" \
-            -scheme "uksalarytaxcalculator" \
+            -scheme "$SCHEME" \
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath $RUNNER_TEMP/SalaryCalc.xcarchive \
