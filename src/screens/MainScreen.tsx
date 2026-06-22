@@ -174,7 +174,7 @@ export function MainScreen({
                   </TouchableOpacity>
                   {showPension && (
                     <View style={styles.pensionBox}>
-                      <ResultRow label="Auto tax saving (20%)" value={current.pension.autoTaxSaving} indent dimmed />
+                      <ResultRow label="Auto tax saving" value={current.pension.autoTaxSaving} indent dimmed />
                       {current.pension.selfAssessmentClaim > 0 && (
                         <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
                       )}

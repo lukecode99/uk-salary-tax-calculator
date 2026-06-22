@@ -154,14 +154,13 @@ function calcPensionBreakdown(
     return { employeeContrib: 0, autoTaxSaving: 0, selfAssessmentClaim: 0, effectiveCost: 0 };
   }
   const marginalRate = calcMarginalRate(taxableIncome, scottishRates, pa, adjustedGross);
-  const autoTaxSaving = payeContrib * PENSION_BASIC_RATE_RELIEF;
-  const extraRate = Math.max(0, marginalRate - PENSION_BASIC_RATE_RELIEF);
-  const selfAssessmentClaim = payeContrib * extraRate;
+  // PAYE net pay: full marginal rate relief is automatic — no SA claim needed
+  const autoTaxSaving = payeContrib * marginalRate;
   return {
     employeeContrib: payeContrib,
     autoTaxSaving,
-    selfAssessmentClaim,
-    effectiveCost: payeContrib - autoTaxSaving - selfAssessmentClaim,
+    selfAssessmentClaim: 0,
+    effectiveCost: payeContrib - autoTaxSaving,
   };
 }
 
