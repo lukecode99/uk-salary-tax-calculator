@@ -1,6 +1,6 @@
 import { StudentLoanPlan, AgeGroup, Period } from './engine/taxEngine';
 
-export type PensionMode = 'percent' | 'fixed';
+export type PensionMode = 'percent' | 'fixed' | 'monthly';
 
 export interface PensionSettings {
   payeEnabled: boolean;

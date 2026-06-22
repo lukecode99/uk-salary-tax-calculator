@@ -19,18 +19,21 @@ function formatGBP(v: number): string {
 }
 
 function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: PensionMode) => void }) {
+  const opts: { value: PensionMode; label: string }[] = [
+    { value: 'percent', label: '%' },
+    { value: 'monthly', label: '£/mo' },
+    { value: 'fixed', label: '£/yr' },
+  ];
   return (
     <View style={tog.container}>
-      {(['percent', 'fixed'] as PensionMode[]).map((m) => (
+      {opts.map(({ value: m, label }) => (
         <TouchableOpacity
           key={m}
           style={[tog.btn, mode === m && tog.btnActive]}
           onPress={() => onChange(m)}
           activeOpacity={0.8}
         >
-          <Text style={[tog.label, mode === m && tog.labelActive]}>
-            {m === 'percent' ? '%' : '£'}
-          </Text>
+          <Text style={[tog.label, mode === m && tog.labelActive]}>{label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -56,7 +59,7 @@ function ValueInput({
       style={styles.valInput}
       keyboardType="decimal-pad"
       value={text}
-      onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0) onChange(n); }}
+      onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0 && (mode !== 'percent' || n <= 100)) onChange(n); }}
       onBlur={() => setText(String(value))}
     />
   );
@@ -90,12 +93,16 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
   function resolve(mode: PensionMode, value: number): number {
     if (annualSalary === 0) return 0;
-    return mode === 'percent' ? annualSalary * (value / 100) : value;
+    if (mode === 'percent') return annualSalary * (value / 100);
+    if (mode === 'monthly') return value * 12;
+    return value; // 'fixed' = annual
   }
 
   const payeEmployee = p.payeEnabled ? resolve(p.payeEmployeeMode, p.payeEmployeeValue) : 0;
   const payeEmployer = p.payeEnabled ? resolve(p.payeEmployerMode, p.payeEmployerValue) : 0;
-  const privateGross = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
+  // private pension: user enters what they physically pay (net); gross into pot = net / 0.8
+  const privateNetPaid = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
+  const privateGross = privateNetPaid > 0 ? privateNetPaid / 0.8 : 0;
 
   const result: FullPensionResult | null = useMemo(() => {
     if (annualSalary <= 0) return null;
@@ -179,21 +186,21 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
           {p.privateEnabled && (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputGroupLabel}>Gross contribution</Text>
+                <Text style={styles.inputGroupLabel}>Amount you pay (post-tax)</Text>
                 <View style={styles.inputRow}>
                   <ModeToggle mode={p.privateMode} onChange={(m) => updatePension({ privateMode: m })} />
                   <ValueInput mode={p.privateMode} value={p.privateValue} onChange={(v) => updatePension({ privateValue: v })} />
-                  {hasSalary && (
-                    <Text style={styles.resolvedAmount}>{formatGBP(privateGross)}/yr</Text>
+                  {hasSalary && privateNetPaid > 0 && (
+                    <Text style={styles.resolvedAmount}>{formatGBP(privateNetPaid)}/yr</Text>
                   )}
                 </View>
               </View>
 
               {hasSalary && result && privateGross > 0 && (
                 <View style={styles.reliefBox}>
-                  <ResultLine label="You physically pay" value={result.privateYouPay} dimmed />
-                  <ResultLine label="HMRC adds (20% basic relief)" value={result.privateBasicRelief} dimmed />
-                  <ResultLine label="Total going in" value={result.privateGross} />
+                  <ResultLine label="You pay" value={result.privateYouPay} dimmed />
+                  <ResultLine label="HMRC adds (basic relief)" value={result.privateBasicRelief} dimmed />
+                  <ResultLine label="Total going into pot" value={result.privateGross} />
                   {result.privateSaClaim > 0 && (
                     <ResultLine label="Self-assessment claim" value={result.privateSaClaim} highlight />
                   )}

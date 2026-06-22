@@ -32,7 +32,9 @@ function toAnnual(value: number, period: Period, hours: number, days: number): n
 }
 
 function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): number {
-  return mode === 'percent' ? grossSalary * (value / 100) : value;
+  if (mode === 'percent') return grossSalary * (value / 100);
+  if (mode === 'monthly') return value * 12;
+  return value; // 'fixed' = annual
 }
 
 export function MainScreen({
@@ -63,7 +65,9 @@ export function MainScreen({
   function getPrivateContrib(annualGross: number): number {
     const p = settings.pension;
     if (!p.privateEnabled) return 0;
-    return pensionAnnual(annualGross, p.privateMode, p.privateValue);
+    // user enters what they physically pay (net); gross into pot = net / 0.8
+    const netAnnual = pensionAnnual(annualGross, p.privateMode, p.privateValue);
+    return netAnnual / 0.8;
   }
 
   const newResult = useMemo(() => {
@@ -180,7 +184,6 @@ export function MainScreen({
                 </>
               )}
 
-              <ResultRow label="Adjusted Net Income" value={current.adjustedNetIncome} dimmed />
               <ResultRow label="Taxable Income" value={current.taxableIncome} />
               <ResultRow label="Income Tax" value={current.incomeTax} />
               <ResultRow label="National Insurance" value={current.nationalInsurance} />
@@ -201,6 +204,9 @@ export function MainScreen({
                   <View style={styles.divider} />
                   <ResultRow label="Private Pension" value={current.privatePension} />
                 </>
+              )}
+              {current.adjustedNetIncome !== current.grossSalary && (
+                <ResultRow label="Adjusted Net Income" value={current.adjustedNetIncome} accent />
               )}
             </View>
           )}
