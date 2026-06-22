@@ -120,23 +120,29 @@ jobs:
       - name: Export IPA
         run: |
           cat > /tmp/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>method</key><string>app-store</string>
-            <key>teamID</key><string>V628699P6F</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>signingCertificate</key><string>iPhone Distribution</string>
-            <key>provisioningProfiles</key><dict>
-              <key>com.lukeholder.uksalarytax</key><string>Salary Tax Calculator Distribution</string>
-            </dict>
-            <key>uploadSymbols</key><true/><key>compileBitcode</key><false/>
-          </dict></plist>
-          PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>method</key><string>app-store</string>
+  <key>teamID</key><string>V628699P6F</string>
+  <key>signingStyle</key><string>manual</string>
+  <key>signingCertificate</key><string>iPhone Distribution</string>
+  <key>provisioningProfiles</key><dict>
+    <key>com.lukeholder.uksalarytax</key><string>f476a334-7fab-4a9e-8c11-10f076a8d7a0</string>
+  </dict>
+  <key>uploadSymbols</key><true/>
+  <key>compileBitcode</key><false/>
+</dict></plist>
+PLIST
+          ASC_KEY=~/.appstoreconnect/private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/SalaryCalc.xcarchive \
             -exportOptionsPlist /tmp/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
+            -exportPath $RUNNER_TEMP/export \
+            -authenticationKeyPath "$ASC_KEY" \
+            -authenticationKeyID "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            -authenticationKeyIssuerID "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}" \
+            -allowProvisioningUpdates
 
       - name: Upload to TestFlight
         run: |
