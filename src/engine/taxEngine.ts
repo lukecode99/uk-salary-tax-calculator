@@ -14,6 +14,7 @@ export type Period = 'annual' | 'monthly' | 'weekly' | 'daily' | 'hourly';
 export interface TaxInputs {
   grossSalary: number;
   payeContrib: number;       // annual £ PAYE employee pension contribution
+  privateContrib?: number;   // annual £ private pension gross contribution
   scottishRates: boolean;
   studentLoan: StudentLoanPlan;
   payNI: boolean;
@@ -32,10 +33,12 @@ export interface PensionBreakdown {
 export interface TaxResult {
   grossSalary: number;
   pension: PensionBreakdown;
+  adjustedNetIncome: number;
   taxableIncome: number;
   incomeTax: number;
   nationalInsurance: number;
   studentLoanRepayment: number;
+  privatePension: number;
   takeHome: number;
 }
 
@@ -205,6 +208,7 @@ export function calculateFullPension(
 
 export function calculate(inputs: TaxInputs): TaxResult {
   const { grossSalary, payeContrib, scottishRates, studentLoan, payNI, ageGroup } = inputs;
+  const privateContrib = inputs.privateContrib ?? 0;
 
   // Pension reduces adjusted net income — used for PA taper and tax bands
   const adjustedGross = grossSalary - payeContrib;
@@ -220,14 +224,18 @@ export function calculate(inputs: TaxInputs): TaxResult {
   const pension = calcPensionBreakdown(payeContrib, taxableIncome, scottishRates, pa, adjustedGross);
 
   const takeHome = grossSalary - payeContrib - incomeTax - nationalInsurance - studentLoanRepayment;
+  // ANI = gross minus both pension types (HMRC definition — used for PA taper, child benefit, etc.)
+  const adjustedNetIncome = grossSalary - payeContrib - privateContrib;
 
   return {
     grossSalary,
     pension,
+    adjustedNetIncome,
     taxableIncome,
     incomeTax,
     nationalInsurance,
     studentLoanRepayment,
+    privatePension: privateContrib,
     takeHome,
   };
 }
@@ -244,10 +252,12 @@ export function toPeriodResult(annual: TaxResult, hoursPerWeek: number, daysPerW
         selfAssessmentClaim: r.pension.selfAssessmentClaim * f,
         effectiveCost: r.pension.effectiveCost * f,
       },
+      adjustedNetIncome: r.adjustedNetIncome * f,
       taxableIncome: r.taxableIncome * f,
       incomeTax: r.incomeTax * f,
       nationalInsurance: r.nationalInsurance * f,
       studentLoanRepayment: r.studentLoanRepayment * f,
+      privatePension: r.privatePension * f,
       takeHome: r.takeHome * f,
     };
   }

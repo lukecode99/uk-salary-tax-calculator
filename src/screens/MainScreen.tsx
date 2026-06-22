@@ -60,11 +60,18 @@ export function MainScreen({
     return pensionAnnual(annualGross, p.payeEmployeeMode, p.payeEmployeeValue);
   }
 
+  function getPrivateContrib(annualGross: number): number {
+    const p = settings.pension;
+    if (!p.privateEnabled) return 0;
+    return pensionAnnual(annualGross, p.privateMode, p.privateValue);
+  }
+
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
       grossSalary: newAnnual,
       payeContrib: getPayeContrib(newAnnual),
+      privateContrib: getPrivateContrib(newAnnual),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -80,6 +87,7 @@ export function MainScreen({
     const annual = calculate({
       grossSalary: oldAnnual,
       payeContrib: getPayeContrib(oldAnnual),
+      privateContrib: getPrivateContrib(oldAnnual),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -154,7 +162,7 @@ export function MainScreen({
 
               {current.pension.employeeContrib > 0 && (
                 <>
-                  <ResultRow label="Pension" value={current.pension.employeeContrib} />
+                  <ResultRow label="Workplace Pension" value={current.pension.employeeContrib} />
                   <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
                     <Text style={styles.expandLink}>
                       {showPension ? '▲ Hide detail' : '▼ Pension detail'}
@@ -172,6 +180,7 @@ export function MainScreen({
                 </>
               )}
 
+              <ResultRow label="Adjusted Net Income" value={current.adjustedNetIncome} dimmed />
               <ResultRow label="Taxable Income" value={current.taxableIncome} />
               <ResultRow label="Income Tax" value={current.incomeTax} />
               <ResultRow label="National Insurance" value={current.nationalInsurance} />
@@ -186,6 +195,13 @@ export function MainScreen({
                 bold
                 accent
               />
+
+              {current.privatePension > 0 && (
+                <>
+                  <View style={styles.divider} />
+                  <ResultRow label="Private Pension" value={current.privatePension} />
+                </>
+              )}
             </View>
           )}
         </ScrollView>
