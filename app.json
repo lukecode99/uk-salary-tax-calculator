@@ -5,11 +5,11 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2563EB"
+      "backgroundColor": "#0D0D0D"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -21,22 +21,10 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2563EB"
+        "backgroundColor": "#0D0D0D"
       },
       "package": "com.lukeholder.uksalarytax"
     },
-    "plugins": [],
-    "runtimeVersion": {
-      "policy": "sdkVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/0668c343-a6f4-44dc-b52b-becc4a639ba4"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "0668c343-a6f4-44dc-b52b-becc4a639ba4"
-      }
-    },
-    "owner": "lukeholder-nano"
+    "plugins": []
   }
 }
