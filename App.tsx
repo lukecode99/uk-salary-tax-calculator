@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainScreen } from './src/screens/MainScreen';
 import { PensionScreen } from './src/screens/PensionScreen';
+import { SalaryScrificeScreen } from './src/screens/SalaryScrificeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { HelpScreen } from './src/screens/HelpScreen';
 import { AppSettings, DEFAULT_SETTINGS, PensionMode } from './src/types';
@@ -69,6 +70,16 @@ export default function App() {
         <Tab.Screen name="Pension" options={{ tabBarLabel: 'Pension' }}>
           {() => (
             <PensionScreen
+              annualSalary={annualSalary}
+              settings={settings}
+              onSettingsChange={setSettings}
+            />
+          )}
+        </Tab.Screen>
+
+        <Tab.Screen name="Sacrifice" options={{ tabBarLabel: 'Sacrifice' }}>
+          {() => (
+            <SalaryScrificeScreen
               annualSalary={annualSalary}
               settings={settings}
               onSettingsChange={setSettings}

@@ -13,8 +13,9 @@ export type Period = 'annual' | 'monthly' | 'weekly' | 'daily' | 'hourly';
 
 export interface TaxInputs {
   grossSalary: number;
-  payeContrib: number;       // annual £ PAYE employee pension contribution
-  privateContrib?: number;   // annual £ private pension gross contribution
+  payeContrib: number;          // annual £ PAYE employee pension contribution
+  privateContrib?: number;      // annual £ private pension gross contribution
+  totalSalaryScrifice?: number; // annual £ total salary sacrifice (car, bike, etc.)
   scottishRates: boolean;
   studentLoan: StudentLoanPlan;
   payNI: boolean;
@@ -208,9 +209,10 @@ export function calculateFullPension(
 export function calculate(inputs: TaxInputs): TaxResult {
   const { grossSalary, payeContrib, scottishRates, studentLoan, payNI, ageGroup } = inputs;
   const privateContrib = inputs.privateContrib ?? 0;
+  const totalSacrifice = inputs.totalSalaryScrifice ?? 0;
 
-  // Pension reduces adjusted net income — used for PA taper and tax bands
-  const adjustedGross = grossSalary - payeContrib;
+  // Salary sacrifice + PAYE pension both reduce taxable gross
+  const adjustedGross = grossSalary - payeContrib - totalSacrifice;
   const pa = calcPersonalAllowance(adjustedGross);
   const taxableIncome = Math.max(0, adjustedGross - pa);
 
@@ -218,13 +220,14 @@ export function calculate(inputs: TaxInputs): TaxResult {
     ? calcIncomeTaxScotland(adjustedGross, pa)
     : calcIncomeTaxEngland(taxableIncome, pa);
 
-  const nationalInsurance = calcNI(grossSalary, ageGroup, payNI);
+  // Salary sacrifice reduces NIable earnings
+  const nationalInsurance = calcNI(grossSalary - totalSacrifice, ageGroup, payNI);
   const studentLoanRepayment = calcStudentLoan(grossSalary, studentLoan);
   const pension = calcPensionBreakdown(payeContrib, taxableIncome, scottishRates, pa, adjustedGross);
 
-  const takeHome = grossSalary - payeContrib - incomeTax - nationalInsurance - studentLoanRepayment;
-  // ANI = gross minus both pension types (HMRC definition — used for PA taper, child benefit, etc.)
-  const adjustedNetIncome = grossSalary - payeContrib - privateContrib;
+  const takeHome = grossSalary - payeContrib - totalSacrifice - incomeTax - nationalInsurance - studentLoanRepayment;
+  // ANI = gross minus pension and sacrifice (HMRC definition — used for PA taper, child benefit, etc.)
+  const adjustedNetIncome = grossSalary - payeContrib - totalSacrifice - privateContrib;
 
   return {
     grossSalary,

@@ -7,7 +7,7 @@ import { calculate, toPeriodResult, TaxResult, Period } from '../engine/taxEngin
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
 import { AdBanner } from '../components/AdBanner';
-import { AppSettings, PensionMode } from '../types';
+import { AppSettings, PensionMode, SacrificeMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -35,6 +35,21 @@ function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): n
   if (mode === 'percent') return grossSalary * (value / 100);
   if (mode === 'monthly') return value * 12;
   return value; // 'fixed' = annual
+}
+
+function sacrificeAnnual(mode: SacrificeMode, value: number): number {
+  return mode === 'monthly' ? value * 12 : value;
+}
+
+function scaleByPeriod(annual: number, period: Period, hours: number, days: number): number {
+  const W = 52;
+  switch (period) {
+    case 'annual': return annual;
+    case 'monthly': return annual / 12;
+    case 'weekly': return annual / W;
+    case 'daily': return annual / (W * days);
+    case 'hourly': return annual / (W * hours);
+  }
 }
 
 export function MainScreen({
@@ -69,12 +84,20 @@ export function MainScreen({
     return netAnnual / 0.8;
   }
 
+  function getTotalSacrifice(): number {
+    const s = settings.sacrifice;
+    const car = s.car.enabled ? sacrificeAnnual(s.car.mode, s.car.value) : 0;
+    const bike = s.bike.enabled ? sacrificeAnnual(s.bike.mode, s.bike.value) : 0;
+    return car + bike;
+  }
+
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
       grossSalary: newAnnual,
       payeContrib: getPayeContrib(newAnnual),
       privateContrib: getPrivateContrib(newAnnual),
+      totalSalaryScrifice: getTotalSacrifice(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -91,6 +114,7 @@ export function MainScreen({
       grossSalary: oldAnnual,
       payeContrib: getPayeContrib(oldAnnual),
       privateContrib: getPrivateContrib(oldAnnual),
+      totalSalaryScrifice: getTotalSacrifice(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -161,6 +185,19 @@ export function MainScreen({
               <ResultRow label="Gross Salary" value={current.grossSalary} bold={!hasOld} />
               {hasOld && (
                 <ResultRow label="Gross Change" value={diff('grossSalary')!} bold />
+              )}
+
+              {settings.sacrifice.car.enabled && settings.sacrifice.car.value > 0 && (
+                <ResultRow
+                  label="Salary Sacrifice – Car"
+                  value={-scaleByPeriod(sacrificeAnnual(settings.sacrifice.car.mode, settings.sacrifice.car.value), resultPeriod, settings.hoursPerWeek, settings.daysPerWeek)}
+                />
+              )}
+              {settings.sacrifice.bike.enabled && settings.sacrifice.bike.value > 0 && (
+                <ResultRow
+                  label="Salary Sacrifice – Bike"
+                  value={-scaleByPeriod(sacrificeAnnual(settings.sacrifice.bike.mode, settings.sacrifice.bike.value), resultPeriod, settings.hoursPerWeek, settings.daysPerWeek)}
+                />
               )}
 
               {current.pension.employeeContrib > 0 && (
