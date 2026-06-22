@@ -36,36 +36,50 @@ jobs:
             }
           "
 
-      - name: Create getUserState shim (Expo SDK @expo/config missing export fix)
+      - name: Create getUserState shim (fix @expo/config missing module-level exports)
         run: |
-          node << 'EOF'
-          const path = require('path');
-          const fs = require('fs');
-          try {
-            const configDir = path.dirname(require.resolve('@expo/config/package.json'));
-            const shimPath = path.join(configDir, 'build', 'getUserState.js');
-            if (!fs.existsSync(shimPath)) {
-              fs.mkdirSync(path.dirname(shimPath), { recursive: true });
-              fs.writeFileSync(shimPath, [
-                '"use strict";',
-                'Object.defineProperty(exports, "__esModule", { value: true });',
-                'exports.getUserState = getUserState;',
-                'const path = require("path");',
-                'const os = require("os");',
-                'function getUserState(filename) {',
-                '  return path.join(os.homedir(), ".expo", filename || "state.json");',
-                '}'
-              ].join('\n'));
-              console.log('getUserState shim created at', shimPath);
-            } else {
-              console.log('getUserState already exists');
+          node -e "
+            const path = require('path');
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            const code = [
+              '\"use strict\";',
+              'Object.defineProperty(exports, \"__esModule\", { value: true });',
+              'const os = require(\"os\");',
+              'const p = require(\"path\");',
+              'const expoDir = p.join(os.homedir(), \".expo\");',
+              'const stateFile = p.join(expoDir, \"state.json\");',
+              'exports.getExpoHomeDirectory = function() { return expoDir; };',
+              'exports.getUserStatePath = function() { return stateFile; };',
+              'exports.getAsync = function() { return Promise.resolve({}); };',
+              'exports.setAsync = function() { return Promise.resolve(); };',
+              'exports.getUserState = function(filename) {',
+              '  const f = filename ? p.join(expoDir, filename) : stateFile;',
+              '  return {',
+              '    getUserStatePath: function() { return f; },',
+              '    getExpoHomeDirectory: function() { return expoDir; },',
+              '    getAsync: function() { return Promise.resolve({}); },',
+              '    setAsync: function() { return Promise.resolve(); }',
+              '  };',
+              '};'
+            ].join(\"\n\");
+            let locs;
+            try {
+              const out = execSync('find node_modules -name package.json -path */@expo/config/package.json 2>/dev/null', {encoding:'utf8'}).trim();
+              locs = out.split('\n').filter(Boolean).map(p2 => path.join(path.dirname(p2), 'build', 'getUserState.js'));
+            } catch(e) {
+              locs = ['node_modules/@expo/config/build/getUserState.js'];
             }
-          } catch(e) {
-            console.log('Shim setup skipped:', e.message);
-          }
-          EOF
+            for (const loc of locs) {
+              fs.mkdirSync(path.dirname(loc), { recursive: true });
+              fs.writeFileSync(loc, code);
+              console.log('Shim written:', loc);
+            }
+          "
 
       - name: Prebuild iOS native project
+        env:
+          EXPO_NO_TELEMETRY: "1"
         run: CI=1 npx expo prebuild --platform ios --clean --no-install
 
       - name: Install CocoaPods
@@ -100,9 +114,8 @@ jobs:
         run: |
           XCWORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" -type d | head -1)
           echo "Workspace: $XCWORKSPACE"
-          # Auto-detect scheme from workspace
-          SCHEME=$(xcodebuild -list -workspace "$XCWORKSPACE" 2>/dev/null | awk '/Schemes:/{found=1; next} found && /^[[:space:]]+[^[:space:]]/{gsub(/^[[:space:]]+|[[:space:]]+$/, ""); print; exit}')
-          echo "Detected scheme: $SCHEME"
+          SCHEME=$(basename "$XCWORKSPACE" .xcworkspace)
+          echo "Scheme: $SCHEME"
           xcodebuild archive \
             -workspace "$XCWORKSPACE" \
             -scheme "$SCHEME" \
@@ -125,7 +138,7 @@ jobs:
               '<?xml version=\"1.0\" encoding=\"UTF-8\"?>',
               '<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">',
               '<plist version=\"1.0\"><dict>',
-              '  <key>method</key><string>app-store</string>',
+              '  <key>method</key><string>app-store-connect</string>',
               '  <key>teamID</key><string>V628699P6F</string>',
               '  <key>signingStyle</key><string>manual</string>',
               '  <key>signingCertificate</key><string>iPhone Distribution</string>',
