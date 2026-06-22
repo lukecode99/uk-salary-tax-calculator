@@ -16,6 +16,7 @@ export interface TaxInputs {
   payeContrib: number;          // annual £ PAYE employee pension contribution
   privateContrib?: number;      // annual £ private pension gross contribution
   totalSalaryScrifice?: number; // annual £ total salary sacrifice (car, bike, etc.)
+  carBiKValue?: number;         // annual taxable BiK value (P11D × rate) — adds to income tax only
   scottishRates: boolean;
   studentLoan: StudentLoanPlan;
   payNI: boolean;
@@ -40,6 +41,8 @@ export interface TaxResult {
   nationalInsurance: number;
   studentLoanRepayment: number;
   privatePension: number;
+  carBiKTaxableValue: number;  // annual BiK value for display
+  carBiKTax: number;           // income tax attributable to the BiK
   takeHome: number;
 }
 
@@ -210,23 +213,31 @@ export function calculate(inputs: TaxInputs): TaxResult {
   const { grossSalary, payeContrib, scottishRates, studentLoan, payNI, ageGroup } = inputs;
   const privateContrib = inputs.privateContrib ?? 0;
   const totalSacrifice = inputs.totalSalaryScrifice ?? 0;
+  const biKValue = inputs.carBiKValue ?? 0;
 
-  // Salary sacrifice + PAYE pension both reduce taxable gross
+  // Salary sacrifice + PAYE pension reduce taxable gross; BiK adds to it for income tax only
   const adjustedGross = grossSalary - payeContrib - totalSacrifice;
-  const pa = calcPersonalAllowance(adjustedGross);
-  const taxableIncome = Math.max(0, adjustedGross - pa);
+  const adjustedGrossWithBiK = adjustedGross + biKValue;
+  const pa = calcPersonalAllowance(adjustedGrossWithBiK);
+  const taxableIncome = Math.max(0, adjustedGrossWithBiK - pa);
 
   const incomeTax = scottishRates
-    ? calcIncomeTaxScotland(adjustedGross, pa)
+    ? calcIncomeTaxScotland(adjustedGrossWithBiK, pa)
     : calcIncomeTaxEngland(taxableIncome, pa);
 
-  // Salary sacrifice reduces NIable earnings
+  // BiK tax = tax difference attributable to the BiK benefit
+  const taxableIncomeWithoutBiK = Math.max(0, adjustedGross - calcPersonalAllowance(adjustedGross));
+  const incomeTaxWithoutBiK = scottishRates
+    ? calcIncomeTaxScotland(adjustedGross, calcPersonalAllowance(adjustedGross))
+    : calcIncomeTaxEngland(taxableIncomeWithoutBiK, calcPersonalAllowance(adjustedGross));
+  const carBiKTax = incomeTax - incomeTaxWithoutBiK;
+
+  // NI: sacrifice reduces NIable earnings; BiK does NOT attract employee NI
   const nationalInsurance = calcNI(grossSalary - totalSacrifice, ageGroup, payNI);
   const studentLoanRepayment = calcStudentLoan(grossSalary, studentLoan);
-  const pension = calcPensionBreakdown(payeContrib, taxableIncome, scottishRates, pa, adjustedGross);
+  const pension = calcPensionBreakdown(payeContrib, taxableIncomeWithoutBiK, scottishRates, calcPersonalAllowance(adjustedGross), adjustedGross);
 
   const takeHome = grossSalary - payeContrib - totalSacrifice - incomeTax - nationalInsurance - studentLoanRepayment;
-  // ANI = gross minus pension and sacrifice (HMRC definition — used for PA taper, child benefit, etc.)
   const adjustedNetIncome = grossSalary - payeContrib - totalSacrifice - privateContrib;
 
   return {
@@ -238,6 +249,8 @@ export function calculate(inputs: TaxInputs): TaxResult {
     nationalInsurance,
     studentLoanRepayment,
     privatePension: privateContrib,
+    carBiKTaxableValue: biKValue,
+    carBiKTax,
     takeHome,
   };
 }
@@ -260,6 +273,8 @@ export function toPeriodResult(annual: TaxResult, hoursPerWeek: number, daysPerW
       nationalInsurance: r.nationalInsurance * f,
       studentLoanRepayment: r.studentLoanRepayment * f,
       privatePension: r.privatePension * f,
+      carBiKTaxableValue: r.carBiKTaxableValue * f,
+      carBiKTax: r.carBiKTax * f,
       takeHome: r.takeHome * f,
     };
   }

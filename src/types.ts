@@ -9,8 +9,13 @@ export interface SacrificeItem {
   value: number;
 }
 
+export interface CarSchemeSettings extends SacrificeItem {
+  p11dValue: number;  // P11D list price of car (£)
+  bikRate: number;    // HMRC CO2-based BiK rate (%, e.g. 15)
+}
+
 export interface SalaryScrificeSettings {
-  car: SacrificeItem;
+  car: CarSchemeSettings;
   bike: SacrificeItem;
 }
 
@@ -56,7 +61,7 @@ export const DEFAULT_PENSION: PensionSettings = {
 };
 
 export const DEFAULT_SACRIFICE: SalaryScrificeSettings = {
-  car: { enabled: false, mode: 'monthly', value: 0 },
+  car: { enabled: false, mode: 'monthly', value: 0, p11dValue: 0, bikRate: 0 },
   bike: { enabled: false, mode: 'monthly', value: 0 },
 };
 

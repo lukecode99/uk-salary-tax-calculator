@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, Switch, TouchableOpacity,
   ScrollView, StyleSheet, SafeAreaView,
 } from 'react-native';
-import { AppSettings, SacrificeItem, SacrificeMode, SalaryScrificeSettings } from '../types';
+import { AppSettings, CarSchemeSettings, SacrificeItem, SacrificeMode, SalaryScrificeSettings } from '../types';
 import { AdBanner } from '../components/AdBanner';
 import { colors, spacing, radius, font } from '../theme';
 
@@ -48,68 +48,160 @@ const tog = StyleSheet.create({
   labelActive: { color: '#000' },
 });
 
-function ValueInput({ mode, value, onChange }: { mode: SacrificeMode; value: number; onChange: (v: number) => void }) {
-  const [text, setText] = React.useState(String(value));
+function NumInput({ value, onChange, placeholder }: { value: number; onChange: (v: number) => void; placeholder?: string }) {
+  const [text, setText] = React.useState(value > 0 ? String(value) : '');
   return (
     <TextInput
       style={styles.valInput}
       keyboardType="decimal-pad"
       value={text}
+      placeholder={placeholder ?? '0'}
+      placeholderTextColor={colors.textMuted}
       onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0) onChange(n); }}
-      onBlur={() => setText(String(value))}
+      onBlur={() => setText(value > 0 ? String(value) : '')}
     />
   );
 }
 
-interface SectionProps {
-  title: string;
-  note?: string;
-  item: SacrificeItem;
-  annualSalary: number;
-  onUpdate: (patch: Partial<SacrificeItem>) => void;
+// BiK rate lookup for common CO2 bands (2025/26)
+function bikRateForCO2(co2: number): number {
+  if (co2 === 0) return 3;          // pure electric
+  if (co2 <= 50) return 5;          // ULEV / plug-in hybrid
+  if (co2 <= 54) return 15;
+  if (co2 <= 59) return 16;
+  if (co2 <= 64) return 17;
+  if (co2 <= 69) return 18;
+  if (co2 <= 74) return 19;
+  if (co2 <= 79) return 20;
+  if (co2 <= 84) return 21;
+  if (co2 <= 89) return 22;
+  if (co2 <= 94) return 23;
+  if (co2 <= 99) return 24;
+  if (co2 <= 104) return 25;
+  if (co2 <= 109) return 26;
+  if (co2 <= 114) return 27;
+  if (co2 <= 119) return 28;
+  if (co2 <= 124) return 29;
+  if (co2 <= 129) return 30;
+  if (co2 <= 134) return 31;
+  if (co2 <= 139) return 32;
+  if (co2 <= 144) return 33;
+  if (co2 <= 149) return 34;
+  if (co2 <= 154) return 35;
+  if (co2 <= 159) return 36;
+  if (co2 <= 164) return 37;
+  return 37; // cap at 37%
 }
 
-function SacrificeSection({ title, note, item, annualSalary, onUpdate }: SectionProps) {
-  const annualAmount = item.enabled ? resolveAnnual(item.mode, item.value) : 0;
-  const hasSalary = annualSalary > 0;
+interface CarSectionProps {
+  car: CarSchemeSettings;
+  annualSalary: number;
+  onUpdate: (patch: Partial<CarSchemeSettings>) => void;
+}
+
+function CarSection({ car, annualSalary, onUpdate }: CarSectionProps) {
+  const [co2Text, setCo2Text] = React.useState('');
+  const annualSacrifice = car.enabled ? resolveAnnual(car.mode, car.value) : 0;
+  const biKValue = car.p11dValue > 0 && car.bikRate > 0 ? car.p11dValue * (car.bikRate / 100) : 0;
+  const hasBiK = car.enabled && biKValue > 0;
+
+  function handleCO2Change(t: string) {
+    setCo2Text(t);
+    const n = parseFloat(t);
+    if (!isNaN(n) && n >= 0) {
+      onUpdate({ bikRate: bikRateForCO2(n) });
+    }
+  }
 
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionTitle}>Company Car Scheme</Text>
         <Switch
-          value={item.enabled}
+          value={car.enabled}
           onValueChange={(v) => onUpdate({ enabled: v })}
           trackColor={{ true: colors.primary }}
-          thumbColor={item.enabled ? '#000' : colors.textSecondary}
+          thumbColor={car.enabled ? '#000' : colors.textSecondary}
         />
       </View>
 
-      {note && <Text style={styles.note}>{note}</Text>}
+      <Text style={styles.note}>
+        Salary sacrifice reduces your gross pay before tax. HMRC also charges income tax on the car's Benefit in Kind (BiK) value based on P11D price × CO2 rate — this is shown separately on your tax code or P11D.
+      </Text>
 
-      {item.enabled && (
+      {car.enabled && (
         <>
+          {/* Salary sacrifice amount */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Amount sacrificed</Text>
+            <Text style={styles.inputLabel}>Monthly lease / salary sacrifice</Text>
             <View style={styles.inputRow}>
-              <ModeToggle mode={item.mode} onChange={(m) => onUpdate({ mode: m })} />
-              <ValueInput mode={item.mode} value={item.value} onChange={(v) => onUpdate({ value: v })} />
-              {hasSalary && annualAmount > 0 && (
-                <Text style={styles.resolvedAmount}>{formatGBP(annualAmount)}/yr</Text>
+              <ModeToggle mode={car.mode} onChange={(m) => onUpdate({ mode: m })} />
+              <NumInput value={car.value} onChange={(v) => onUpdate({ value: v })} placeholder="0" />
+              {annualSacrifice > 0 && (
+                <Text style={styles.resolvedAmount}>{formatGBP(annualSacrifice)}/yr</Text>
               )}
             </View>
           </View>
 
-          {hasSalary && annualAmount > 0 && (
+          {/* P11D value */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>P11D value (list price of car)</Text>
+            <View style={styles.inputRow}>
+              <Text style={styles.prefix}>£</Text>
+              <NumInput value={car.p11dValue} onChange={(v) => onUpdate({ p11dValue: v })} placeholder="e.g. 25000" />
+            </View>
+          </View>
+
+          {/* CO2 + BiK rate */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>CO2 emissions (g/km) — auto-sets BiK rate</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={[styles.valInput, { flex: 1 }]}
+                keyboardType="decimal-pad"
+                value={co2Text}
+                placeholder="e.g. 120"
+                placeholderTextColor={colors.textMuted}
+                onChangeText={handleCO2Change}
+              />
+              <Text style={styles.resolvedAmount}>BiK rate</Text>
+              <View style={styles.bikRateBox}>
+                <TextInput
+                  style={styles.bikRateInput}
+                  keyboardType="decimal-pad"
+                  value={car.bikRate > 0 ? String(car.bikRate) : ''}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  onChangeText={(t) => { const n = parseFloat(t); if (!isNaN(n) && n >= 0 && n <= 37) onUpdate({ bikRate: n }); }}
+                />
+                <Text style={styles.pct}>%</Text>
+              </View>
+            </View>
+          </View>
+
+          {hasBiK && (
             <View style={styles.infoBox}>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Salary sacrificed</Text>
-                <Text style={styles.infoValue}>{formatGBP(annualAmount)}/yr</Text>
+                <Text style={styles.infoLabel}>P11D value</Text>
+                <Text style={styles.infoValue}>{formatGBP(car.p11dValue)}</Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>{formatGBP(annualAmount / 12)}/mo from payslip</Text>
-                <Text style={styles.infoLabel}>before tax & NI</Text>
+                <Text style={styles.infoLabel}>BiK rate</Text>
+                <Text style={styles.infoValue}>{car.bikRate}%</Text>
               </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Annual taxable BiK benefit</Text>
+                <Text style={styles.infoValue}>{formatGBP(biKValue)}</Text>
+              </View>
+              <Text style={styles.hintSmall}>
+                This adds to your taxable income. Income tax on the BiK is shown on the Calculator tab.
+              </Text>
+              {car.bikRate > 5 && (
+                <Text style={styles.hintSmall}>
+                  CO2 &gt;75g/km: OpRA rules apply — your salary sacrifice doesn't save employee NI for this car type.
+                </Text>
+              )}
             </View>
           )}
         </>
@@ -121,15 +213,15 @@ function SacrificeSection({ title, note, item, annualSalary, onUpdate }: Section
 export function SalaryScrificeScreen({ annualSalary, settings, onSettingsChange }: Props) {
   const s = settings.sacrifice;
 
-  function update(key: keyof SalaryScrificeSettings, patch: Partial<SacrificeItem>) {
-    onSettingsChange({
-      ...settings,
-      sacrifice: { ...s, [key]: { ...s[key], ...patch } },
-    });
+  function updateCar(patch: Partial<CarSchemeSettings>) {
+    onSettingsChange({ ...settings, sacrifice: { ...s, car: { ...s.car, ...patch } } });
   }
 
-  const totalAnnual = (s.car.enabled ? resolveAnnual(s.car.mode, s.car.value) : 0)
-    + (s.bike.enabled ? resolveAnnual(s.bike.mode, s.bike.value) : 0);
+  function updateBike(patch: Partial<SacrificeItem>) {
+    onSettingsChange({ ...settings, sacrifice: { ...s, bike: { ...s.bike, ...patch } } });
+  }
+
+  const bikeAnnual = s.bike.enabled ? resolveAnnual(s.bike.mode, s.bike.value) : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -142,36 +234,43 @@ export function SalaryScrificeScreen({ annualSalary, settings, onSettingsChange 
           </View>
         )}
 
-        <SacrificeSection
-          title="Company Car Scheme"
-          note="Reduces gross salary before income tax. Under OpRA rules (2017+), most car schemes don't save employee NI — only electric/ULEV vehicles retain the full benefit."
-          item={s.car}
-          annualSalary={annualSalary}
-          onUpdate={(p) => update('car', p)}
-        />
+        <CarSection car={s.car} annualSalary={annualSalary} onUpdate={updateCar} />
 
-        <SacrificeSection
-          title="Cycle to Work"
-          note="Saves income tax AND NI. HMRC exempts bike schemes from OpRA rules."
-          item={s.bike}
-          annualSalary={annualSalary}
-          onUpdate={(p) => update('bike', p)}
-        />
-
-        {totalAnnual > 0 && annualSalary > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Total</Text>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total sacrificed / yr</Text>
-              <Text style={styles.totalValue}>{formatGBP(totalAnnual)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total sacrificed / mo</Text>
-              <Text style={styles.totalValue}>{formatGBP(totalAnnual / 12)}</Text>
-            </View>
-            <Text style={styles.hint}>See Calculator tab for the full impact on your take-home pay.</Text>
+        {/* Bike */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.sectionTitle}>Cycle to Work</Text>
+            <Switch
+              value={s.bike.enabled}
+              onValueChange={(v) => updateBike({ enabled: v })}
+              trackColor={{ true: colors.primary }}
+              thumbColor={s.bike.enabled ? '#000' : colors.textSecondary}
+            />
           </View>
-        )}
+          <Text style={styles.note}>Saves income tax AND NI — HMRC exempts bike schemes from OpRA rules.</Text>
+          {s.bike.enabled && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Amount sacrificed</Text>
+                <View style={styles.inputRow}>
+                  <ModeToggle mode={s.bike.mode} onChange={(m) => updateBike({ mode: m })} />
+                  <NumInput value={s.bike.value} onChange={(v) => updateBike({ value: v })} />
+                  {bikeAnnual > 0 && (
+                    <Text style={styles.resolvedAmount}>{formatGBP(bikeAnnual)}/yr</Text>
+                  )}
+                </View>
+              </View>
+              {bikeAnnual > 0 && (
+                <View style={styles.infoBox}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>{formatGBP(bikeAnnual / 12)}/mo before tax & NI</Text>
+                    <Text style={styles.infoValue}>{formatGBP(bikeAnnual)}/yr</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </View>
       </ScrollView>
       <AdBanner />
     </SafeAreaView>
@@ -202,30 +301,14 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sectionTitle: {
-    fontSize: font.sizes.lg,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  note: {
-    fontSize: font.sizes.xs,
-    color: colors.textSecondary,
-    lineHeight: 17,
-  },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sectionTitle: { fontSize: font.sizes.lg, fontWeight: '700', color: colors.text },
+  note: { fontSize: font.sizes.xs, color: colors.textSecondary, lineHeight: 17 },
   inputGroup: { gap: spacing.xs },
   inputLabel: { fontSize: font.sizes.sm, color: colors.textSecondary, fontWeight: '500' },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
+  inputRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  prefix: { fontSize: font.sizes.md, color: colors.textSecondary, fontWeight: '600' },
   valInput: {
-    flex: 1,
     backgroundColor: colors.inputBg,
     color: colors.inputText,
     borderRadius: radius.sm,
@@ -234,31 +317,31 @@ const styles = StyleSheet.create({
     fontSize: font.sizes.md,
     fontWeight: '600',
     textAlign: 'right',
+    minWidth: 80,
   },
-  resolvedAmount: {
-    fontSize: font.sizes.sm,
-    color: colors.textSecondary,
-    minWidth: 72,
+  resolvedAmount: { fontSize: font.sizes.sm, color: colors.textSecondary, minWidth: 60, textAlign: 'right' },
+  bikRateBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bikRateInput: {
+    backgroundColor: colors.inputBg,
+    color: colors.inputText,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    fontSize: font.sizes.md,
+    fontWeight: '600',
     textAlign: 'right',
+    width: 52,
   },
+  pct: { fontSize: font.sizes.md, color: colors.textSecondary },
   infoBox: {
     backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
     padding: spacing.sm,
     gap: spacing.xs,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  infoLabel: { fontSize: font.sizes.sm, color: colors.textSecondary },
+  divider: { height: 1, backgroundColor: colors.border, marginVertical: 2 },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  infoLabel: { fontSize: font.sizes.sm, color: colors.textSecondary, flex: 1 },
   infoValue: { fontSize: font.sizes.sm, color: colors.text, fontWeight: '600' },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-  },
-  totalLabel: { fontSize: font.sizes.md, color: colors.textSecondary },
-  totalValue: { fontSize: font.sizes.md, color: colors.text, fontWeight: '700' },
-  hint: { fontSize: font.sizes.xs, color: colors.textSecondary, marginTop: spacing.xs },
+  hintSmall: { fontSize: font.sizes.xs, color: colors.textSecondary, marginTop: 2, lineHeight: 16 },
 });

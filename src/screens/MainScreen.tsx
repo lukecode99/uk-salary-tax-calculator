@@ -91,6 +91,12 @@ export function MainScreen({
     return car + bike;
   }
 
+  function getCarBiKValue(): number {
+    const c = settings.sacrifice.car;
+    if (!c.enabled || !c.p11dValue || !c.bikRate) return 0;
+    return c.p11dValue * (c.bikRate / 100);
+  }
+
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
@@ -98,6 +104,7 @@ export function MainScreen({
       payeContrib: getPayeContrib(newAnnual),
       privateContrib: getPrivateContrib(newAnnual),
       totalSalaryScrifice: getTotalSacrifice(),
+      carBiKValue: getCarBiKValue(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -115,6 +122,7 @@ export function MainScreen({
       payeContrib: getPayeContrib(oldAnnual),
       privateContrib: getPrivateContrib(oldAnnual),
       totalSalaryScrifice: getTotalSacrifice(),
+      carBiKValue: getCarBiKValue(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -188,10 +196,24 @@ export function MainScreen({
               )}
 
               {settings.sacrifice.car.enabled && settings.sacrifice.car.value > 0 && (
-                <ResultRow
-                  label="Salary Sacrifice – Car"
-                  value={-scaleByPeriod(sacrificeAnnual(settings.sacrifice.car.mode, settings.sacrifice.car.value), resultPeriod, settings.hoursPerWeek, settings.daysPerWeek)}
-                />
+                <>
+                  <ResultRow
+                    label="Salary Sacrifice – Car"
+                    value={-scaleByPeriod(sacrificeAnnual(settings.sacrifice.car.mode, settings.sacrifice.car.value), resultPeriod, settings.hoursPerWeek, settings.daysPerWeek)}
+                  />
+                  {current.carBiKTaxableValue > 0 && (
+                    <View style={styles.pensionBox}>
+                      <View style={styles.pensionRow}>
+                        <Text style={styles.pensionLabel}>BiK taxable value (P11D × rate)</Text>
+                        <Text style={styles.pensionValue}>{formatCurrency(current.carBiKTaxableValue)}</Text>
+                      </View>
+                      <View style={styles.pensionRow}>
+                        <Text style={styles.pensionLabel}>Est. income tax on BiK</Text>
+                        <Text style={styles.pensionValue}>{formatCurrency(-current.carBiKTax)}</Text>
+                      </View>
+                    </View>
+                  )}
+                </>
               )}
               {settings.sacrifice.bike.enabled && settings.sacrifice.bike.value > 0 && (
                 <ResultRow
