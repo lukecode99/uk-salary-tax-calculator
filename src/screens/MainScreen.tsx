@@ -127,26 +127,42 @@ export function MainScreen({
           {/* Salary inputs */}
           <View style={styles.card}>
             <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>New</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor={colors.textMuted}
-                value={newSalary}
-                onChangeText={setNewSalary}
-              />
+              <Text style={styles.inputLabel} numberOfLines={1}>New</Text>
+              <View style={styles.inputWrapper}>
+                <Text style={styles.currencyPrefix}>£</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  value={newSalary}
+                  onChangeText={(t) => {
+                    const raw = t.replace(/[^0-9.]/g, '');
+                    const [int, dec] = raw.split('.');
+                    const formatted = int === '' ? '' : int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec !== undefined ? '.' + dec : '');
+                    setNewSalary(formatted);
+                  }}
+                />
+              </View>
             </View>
             <View style={styles.inputRow}>
-              <Text style={styles.inputLabel}>Old</Text>
-              <TextInput
-                style={[styles.input, styles.inputAlt]}
-                keyboardType="decimal-pad"
-                placeholder="Optional"
-                placeholderTextColor={colors.textMuted}
-                value={oldSalary}
-                onChangeText={setOldSalary}
-              />
+              <Text style={styles.inputLabel} numberOfLines={1}>Old</Text>
+              <View style={[styles.inputWrapper, styles.inputWrapperAlt]}>
+                <Text style={styles.currencyPrefix}>£</Text>
+                <TextInput
+                  style={styles.input}
+                  keyboardType="decimal-pad"
+                  placeholder="Optional"
+                  placeholderTextColor={colors.textMuted}
+                  value={oldSalary}
+                  onChangeText={(t) => {
+                    const raw = t.replace(/[^0-9.]/g, '');
+                    const [int, dec] = raw.split('.');
+                    const formatted = int === '' ? '' : int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec !== undefined ? '.' + dec : '');
+                    setOldSalary(formatted);
+                  }}
+                />
+              </View>
             </View>
             <PeriodSelector value={inputPeriod} onChange={setInputPeriod} />
           </View>
@@ -242,23 +258,36 @@ const styles = StyleSheet.create({
     fontSize: font.sizes.sm,
     fontWeight: '600',
     color: colors.textSecondary,
-    width: 30,
+    width: 38,
     flexShrink: 0,
+  },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    minWidth: 0,
+  },
+  inputWrapperAlt: {
+    backgroundColor: '#1E1E1E',
+  },
+  currencyPrefix: {
+    color: colors.textSecondary,
+    fontSize: font.sizes.md,
+    fontWeight: '600',
+    marginRight: 2,
   },
   input: {
     flex: 1,
-    backgroundColor: colors.inputBg,
     color: colors.inputText,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    fontSize: font.sizes.lg,
+    fontSize: font.sizes.md,
     fontWeight: '600',
     textAlign: 'right',
     minWidth: 0,
-  },
-  inputAlt: {
-    backgroundColor: '#1E1E1E',
+    padding: 0,
   },
   sectionTitle: {
     fontSize: font.sizes.lg,
