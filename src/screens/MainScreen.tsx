@@ -1,13 +1,13 @@
 import React, { useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, StyleSheet,
-  SafeAreaView, KeyboardAvoidingView, Platform, TouchableOpacity,
+  TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { calculate, toPeriodResult, TaxResult, Period } from '../engine/taxEngine';
+import { calculate, toPeriodResult, calculateFullPension, TaxResult, Period } from '../engine/taxEngine';
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
 import { AdBanner } from '../components/AdBanner';
-import { AppSettings, PensionMode, SacrificeMode } from '../types';
+import { AppSettings, PensionMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -32,24 +32,7 @@ function toAnnual(value: number, period: Period, hours: number, days: number): n
 }
 
 function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): number {
-  if (mode === 'percent') return grossSalary * (value / 100);
-  if (mode === 'monthly') return value * 12;
-  return value; // 'fixed' = annual
-}
-
-function sacrificeAnnual(mode: SacrificeMode, value: number): number {
-  return mode === 'monthly' ? value * 12 : value;
-}
-
-function scaleByPeriod(annual: number, period: Period, hours: number, days: number): number {
-  const W = 52;
-  switch (period) {
-    case 'annual': return annual;
-    case 'monthly': return annual / 12;
-    case 'weekly': return annual / W;
-    case 'daily': return annual / (W * days);
-    case 'hourly': return annual / (W * hours);
-  }
+  return mode === 'percent' ? grossSalary * (value / 100) : value;
 }
 
 export function MainScreen({
@@ -57,7 +40,7 @@ export function MainScreen({
   inputPeriod, setInputPeriod, settings,
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
-  const [showPrivatePensionDetail, setShowPrivatePensionDetail] = React.useState(false);
+  const [showPension, setShowPension] = React.useState(false);
 
   const newAnnual = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
@@ -77,35 +60,11 @@ export function MainScreen({
     return pensionAnnual(annualGross, p.payeEmployeeMode, p.payeEmployeeValue);
   }
 
-  function getPrivateContrib(annualGross: number): number {
-    const p = settings.pension;
-    if (!p.privateEnabled) return 0;
-    // user enters what they physically pay (net); gross into pot = net / 0.8
-    const netAnnual = pensionAnnual(annualGross, p.privateMode, p.privateValue);
-    return netAnnual / 0.8;
-  }
-
-  function getTotalSacrifice(): number {
-    const s = settings.sacrifice;
-    const car = s.car.enabled ? sacrificeAnnual(s.car.mode, s.car.value) : 0;
-    const bike = s.bike.enabled ? sacrificeAnnual(s.bike.mode, s.bike.value) : 0;
-    return car + bike;
-  }
-
-  function getCarBiKValue(): number {
-    const c = settings.sacrifice.car;
-    if (!c.enabled || !c.p11dValue || !c.bikRate) return 0;
-    return c.p11dValue * (c.bikRate / 100);
-  }
-
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
       grossSalary: newAnnual,
       payeContrib: getPayeContrib(newAnnual),
-      privateContrib: getPrivateContrib(newAnnual),
-      totalSalaryScrifice: getTotalSacrifice(),
-      carBiKValue: getCarBiKValue(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -121,9 +80,6 @@ export function MainScreen({
     const annual = calculate({
       grossSalary: oldAnnual,
       payeContrib: getPayeContrib(oldAnnual),
-      privateContrib: getPrivateContrib(oldAnnual),
-      totalSalaryScrifice: getTotalSacrifice(),
-      carBiKValue: getCarBiKValue(),
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -134,6 +90,17 @@ export function MainScreen({
     return toPeriodResult(annual, settings.hoursPerWeek, settings.daysPerWeek);
   }, [oldAnnual, settings]);
 
+  const privateSaClaim = useMemo(() => {
+    if (newAnnual === null) return 0;
+    const p = settings.pension;
+    if (!p.privateEnabled || p.privateValue === 0) return 0;
+    const privateGross = p.privateMode === 'percent' ? newAnnual * (p.privateValue / 100) : p.privateValue;
+    const payeEmp = getPayeContrib(newAnnual);
+    const payeEmpR = p.payeEnabled ? (p.payeEmployerMode === 'percent' ? newAnnual * (p.payeEmployerValue / 100) : p.payeEmployerValue) : 0;
+    const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates);
+    return full.privateSaClaim;
+  }, [newAnnual, settings]);
+
   function diff(key: keyof TaxResult): number | null {
     if (!newResult || !oldResult) return null;
     const n = newResult[resultPeriod][key] as number;
@@ -143,20 +110,6 @@ export function MainScreen({
 
   const current = newResult?.[resultPeriod];
   const hasOld = !!oldResult;
-
-  // Private pension breakdown (for detail box and SA note)
-  const privatePensionBreakdown = useMemo(() => {
-    if (!current || !current.privatePension || current.privatePension <= 0) return null;
-    const grossContrib = current.privatePension;
-    const netYouPay = grossContrib * 0.8;
-    const basicRelief = grossContrib * 0.2;
-    // Determine marginal rate from annual adjusted net income
-    const annualAdjustedNet = newResult?.annual.adjustedNetIncome ?? 0;
-    const marginalRate = annualAdjustedNet > 125140 ? 0.45 : annualAdjustedNet > 50270 ? 0.40 : 0.20;
-    const saClaim = grossContrib * Math.max(0, marginalRate - 0.20);
-    const annualSaClaim = (newResult?.annual.privatePension ?? 0) * Math.max(0, marginalRate - 0.20);
-    return { grossContrib, netYouPay, basicRelief, saClaim, annualSaClaim };
-  }, [current, newResult]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -210,87 +163,21 @@ export function MainScreen({
                 <ResultRow label="Gross Change" value={diff('grossSalary')!} bold />
               )}
 
-              {settings.sacrifice.car.enabled && settings.sacrifice.car.value > 0 && (() => {
-                const carSacrificeAnnual = sacrificeAnnual(settings.sacrifice.car.mode, settings.sacrifice.car.value);
-                const carSacrificePerPeriod = scaleByPeriod(carSacrificeAnnual, resultPeriod, settings.hoursPerWeek, settings.daysPerWeek);
-                const carBiKPerPeriod = scaleByPeriod(current.carBiKTaxableValue, resultPeriod, settings.hoursPerWeek, settings.daysPerWeek);
-                // Net = BiK increase minus salary reduction (net income adjustment)
-                const carNetPerPeriod = carBiKPerPeriod - carSacrificePerPeriod;
-                return (
-                  <>
-                    <ResultRow label="Salary Sacrifice – Car" value={carNetPerPeriod} />
-                    <View style={styles.pensionBox}>
-                      <View style={styles.pensionRow}>
-                        <Text style={styles.pensionLabel}>Salary reduction</Text>
-                        <Text style={styles.pensionValue}>{formatCurrency(-carSacrificePerPeriod)}</Text>
-                      </View>
-                      <View style={styles.pensionRow}>
-                        <Text style={styles.pensionLabel}>BiK taxable increase</Text>
-                        <Text style={styles.pensionValue}>+{formatCurrency(carBiKPerPeriod)}</Text>
-                      </View>
-                    </View>
-                  </>
-                );
-              })()}
-              {settings.sacrifice.bike.enabled && settings.sacrifice.bike.value > 0 && (
-                <ResultRow
-                  label="Salary Sacrifice – Bike"
-                  value={-scaleByPeriod(sacrificeAnnual(settings.sacrifice.bike.mode, settings.sacrifice.bike.value), resultPeriod, settings.hoursPerWeek, settings.daysPerWeek)}
-                />
-              )}
-
               {current.pension.employeeContrib > 0 && (
                 <>
-                  <ResultRow label="Workplace Pension" value={-current.pension.employeeContrib} />
-                  <View style={styles.pensionBox}>
-                    <View style={styles.pensionRow}>
-                      <Text style={styles.pensionLabel}>Auto tax saving</Text>
-                      <Text style={styles.pensionValue}>{formatCurrency(current.pension.autoTaxSaving)}</Text>
-                    </View>
-                    <View style={styles.pensionRow}>
-                      <Text style={[styles.pensionLabel, styles.pensionLabelBold]}>Net pension cost</Text>
-                      <Text style={[styles.pensionValue, styles.pensionValueBold]}>{formatCurrency(current.pension.effectiveCost)}</Text>
-                    </View>
-                  </View>
-                </>
-              )}
-
-              {/* Private pension — moved here, under workplace pension */}
-              {privatePensionBreakdown && (
-                <>
-                  <TouchableOpacity
-                    style={styles.pensionToggleRow}
-                    onPress={() => setShowPrivatePensionDetail(v => !v)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.pensionToggleInner}>
-                      <Text style={styles.pensionToggleLabel}>Private Pension</Text>
-                      <View style={styles.pensionToggleRight}>
-                        <Text style={styles.pensionToggleValue}>{formatCurrency(-privatePensionBreakdown.netYouPay)}</Text>
-                        <Text style={styles.chevron}>{showPrivatePensionDetail ? '▲' : '▼'}</Text>
-                      </View>
-                    </View>
+                  <ResultRow label="Pension" value={current.pension.employeeContrib} />
+                  <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
+                    <Text style={styles.expandLink}>
+                      {showPension ? '▲ Hide detail' : '▼ Pension detail'}
+                    </Text>
                   </TouchableOpacity>
-                  {showPrivatePensionDetail && (
+                  {showPension && (
                     <View style={styles.pensionBox}>
-                      <View style={styles.pensionRow}>
-                        <Text style={styles.pensionLabel}>You pay (net)</Text>
-                        <Text style={styles.pensionValue}>{formatCurrency(-privatePensionBreakdown.netYouPay)}</Text>
-                      </View>
-                      <View style={styles.pensionRow}>
-                        <Text style={styles.pensionLabel}>Basic rate relief (auto)</Text>
-                        <Text style={styles.pensionValue}>+{formatCurrency(privatePensionBreakdown.basicRelief)}</Text>
-                      </View>
-                      <View style={[styles.pensionRow, styles.pensionDividerRow]}>
-                        <Text style={[styles.pensionLabel, styles.pensionLabelBold]}>Total into pension</Text>
-                        <Text style={[styles.pensionValue, styles.pensionValueBold]}>{formatCurrency(privatePensionBreakdown.grossContrib)}</Text>
-                      </View>
-                      {privatePensionBreakdown.saClaim > 0 && (
-                        <View style={styles.pensionRow}>
-                          <Text style={[styles.pensionLabel, styles.saClaimLabel]}>SA claimable</Text>
-                          <Text style={[styles.pensionValue, styles.saClaimValue]}>+{formatCurrency(privatePensionBreakdown.saClaim)}</Text>
-                        </View>
+                      <ResultRow label="Auto tax saving (20%)" value={current.pension.autoTaxSaving} indent dimmed />
+                      {current.pension.selfAssessmentClaim > 0 && (
+                        <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
                       )}
+                      <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
                     </View>
                   )}
                 </>
@@ -311,18 +198,10 @@ export function MainScreen({
                 accent
               />
 
-              {current.adjustedNetIncome !== current.grossSalary && (
-                <ResultRow label="Adjusted Net Income" value={current.adjustedNetIncome} accent />
-              )}
-
-              {/* SA note — shown if private pension + higher/additional rate taxpayer */}
-              {privatePensionBreakdown && privatePensionBreakdown.annualSaClaim > 0 && (
-                <View style={styles.saNoteBox}>
+              {privateSaClaim > 0 && (
+                <View style={styles.saNote}>
                   <Text style={styles.saNoteText}>
-                    💡 You can claim an extra{' '}
-                    <Text style={styles.saNoteAmount}>{formatCurrency(privatePensionBreakdown.annualSaClaim)}</Text>
-                    {' '}tax relief on your private pension contributions for this year via{' '}
-                    <Text style={styles.saNoteLink}>Self Assessment</Text>.
+                    💡 Claim {formatCurrency(privateSaClaim)} back via Self Assessment — higher-rate relief on your private pension. Submit via your annual tax return.
                   </Text>
                 </View>
               )}
@@ -391,94 +270,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginVertical: spacing.xs,
   },
+  expandLink: {
+    color: colors.primary,
+    fontSize: font.sizes.sm,
+    paddingVertical: spacing.xs,
+  },
   pensionBox: {
     backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
-    padding: spacing.sm,
-    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.xs,
   },
-  pensionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  pensionDividerRow: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    marginTop: 4,
-    paddingTop: 6,
-  },
-  pensionLabel: {
-    fontSize: font.sizes.sm,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  pensionLabelBold: {
-    color: colors.text,
-    fontWeight: '600',
-  },
-  pensionValue: {
-    fontSize: font.sizes.sm,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  pensionValueBold: {
-    color: colors.text,
-    fontWeight: '700',
-  },
-  pensionToggleRow: {
-    paddingVertical: 2,
-  },
-  pensionToggleInner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pensionToggleLabel: {
-    fontSize: font.sizes.md,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  pensionToggleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  pensionToggleValue: {
-    fontSize: font.sizes.md,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  chevron: {
-    fontSize: 10,
-    color: colors.textMuted,
-  },
-  saClaimLabel: {
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  saClaimValue: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  saNoteBox: {
+  saNote: {
     backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
     padding: spacing.sm,
     marginTop: spacing.xs,
   },
   saNoteText: {
+    color: colors.primary,
     fontSize: font.sizes.sm,
-    color: colors.textSecondary,
+    fontWeight: '500',
     lineHeight: 18,
-  },
-  saNoteAmount: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  saNoteLink: {
-    color: colors.primary,
-    fontWeight: '600',
   },
 });

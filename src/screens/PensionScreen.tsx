@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View, Text, TextInput, Switch, TouchableOpacity,
   ScrollView, StyleSheet, SafeAreaView,
@@ -19,21 +19,18 @@ function formatGBP(v: number): string {
 }
 
 function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: PensionMode) => void }) {
-  const opts: { value: PensionMode; label: string }[] = [
-    { value: 'percent', label: '%' },
-    { value: 'monthly', label: '£/mo' },
-    { value: 'fixed', label: '£/yr' },
-  ];
   return (
     <View style={tog.container}>
-      {opts.map(({ value: m, label }) => (
+      {(['percent', 'fixed'] as PensionMode[]).map((m) => (
         <TouchableOpacity
           key={m}
           style={[tog.btn, mode === m && tog.btnActive]}
           onPress={() => onChange(m)}
           activeOpacity={0.8}
         >
-          <Text style={[tog.label, mode === m && tog.labelActive]}>{label}</Text>
+          <Text style={[tog.label, mode === m && tog.labelActive]}>
+            {m === 'percent' ? '%' : '£'}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -59,7 +56,7 @@ function ValueInput({
       style={styles.valInput}
       keyboardType="decimal-pad"
       value={text}
-      onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0 && (mode !== 'percent' || n <= 100)) onChange(n); }}
+      onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0) onChange(n); }}
       onBlur={() => setText(String(value))}
     />
   );
@@ -86,6 +83,7 @@ function ResultLine({
 
 export function PensionScreen({ annualSalary, settings, onSettingsChange }: Props) {
   const p = settings.pension;
+  const [showPrivateDetail, setShowPrivateDetail] = useState(false);
 
   function updatePension(patch: Partial<PensionSettings>) {
     onSettingsChange({ ...settings, pension: { ...p, ...patch } });
@@ -93,16 +91,12 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
   function resolve(mode: PensionMode, value: number): number {
     if (annualSalary === 0) return 0;
-    if (mode === 'percent') return annualSalary * (value / 100);
-    if (mode === 'monthly') return value * 12;
-    return value; // 'fixed' = annual
+    return mode === 'percent' ? annualSalary * (value / 100) : value;
   }
 
   const payeEmployee = p.payeEnabled ? resolve(p.payeEmployeeMode, p.payeEmployeeValue) : 0;
   const payeEmployer = p.payeEnabled ? resolve(p.payeEmployerMode, p.payeEmployerValue) : 0;
-  // private pension: user enters what they physically pay (net); gross into pot = net / 0.8
-  const privateNetPaid = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
-  const privateGross = privateNetPaid > 0 ? privateNetPaid / 0.8 : 0;
+  const privateGross = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
 
   const result: FullPensionResult | null = useMemo(() => {
     if (annualSalary <= 0) return null;
@@ -129,8 +123,9 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
           </View>
         )}
 
-        {/* PAYE Section */}
+        {/* Combined Pension Card */}
         <View style={styles.card}>
+          {/* Workplace Pension subsection */}
           <View style={styles.cardHeader}>
             <SectionHeader title="PAYE / Workplace Pension" />
             <Switch
@@ -169,15 +164,16 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
               </View>
             </>
           )}
-        </View>
 
-        {/* Private Pension Section */}
-        <View style={styles.card}>
+          {/* Divider between sections */}
+          <View style={styles.sectionDivider} />
+
+          {/* Private Pension subsection */}
           <View style={styles.cardHeader}>
             <SectionHeader title="Private Pension" />
             <Switch
               value={p.privateEnabled}
-              onValueChange={(v) => updatePension({ privateEnabled: v })}
+              onValueChange={(v) => { updatePension({ privateEnabled: v }); if (!v) setShowPrivateDetail(false); }}
               trackColor={{ true: colors.primary }}
               thumbColor={p.privateEnabled ? '#000' : colors.textSecondary}
             />
@@ -186,29 +182,36 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
           {p.privateEnabled && (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputGroupLabel}>Amount you pay (post-tax)</Text>
+                <Text style={styles.inputGroupLabel}>Gross contribution</Text>
                 <View style={styles.inputRow}>
                   <ModeToggle mode={p.privateMode} onChange={(m) => updatePension({ privateMode: m })} />
                   <ValueInput mode={p.privateMode} value={p.privateValue} onChange={(v) => updatePension({ privateValue: v })} />
-                  {hasSalary && privateNetPaid > 0 && (
-                    <Text style={styles.resolvedAmount}>{formatGBP(privateNetPaid)}/yr</Text>
+                  {hasSalary && (
+                    <Text style={styles.resolvedAmount}>{formatGBP(privateGross)}/yr</Text>
                   )}
                 </View>
               </View>
 
-              {hasSalary && result && privateGross > 0 && (
+              {hasSalary && privateGross > 0 && (
+                <TouchableOpacity onPress={() => setShowPrivateDetail(v => !v)} activeOpacity={0.7}>
+                  <Text style={styles.expandLink}>
+                    {showPrivateDetail ? '▲ Hide detail' : '▼ Show detail'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {hasSalary && result && privateGross > 0 && showPrivateDetail && (
                 <View style={styles.reliefBox}>
-                  <ResultLine label="You pay" value={result.privateYouPay} dimmed />
-                  <ResultLine label="HMRC adds (basic relief)" value={result.privateBasicRelief} dimmed />
-                  <ResultLine label="Total going into pot" value={result.privateGross} />
+                  <ResultLine label="You physically pay" value={result.privateYouPay} dimmed />
+                  <ResultLine label="HMRC adds (20% basic relief)" value={result.privateBasicRelief} dimmed />
+                  <ResultLine label="Total going in" value={result.privateGross} />
                   {result.privateSaClaim > 0 && (
                     <ResultLine label="Self-assessment claim" value={result.privateSaClaim} highlight />
                   )}
+                  {result.privateSaClaim === 0 && (
+                    <Text style={styles.note}>Basic rate taxpayer — no extra SA claim needed.</Text>
+                  )}
                 </View>
-              )}
-
-              {hasSalary && result && privateGross > 0 && result.privateSaClaim === 0 && (
-                <Text style={styles.note}>Basic rate taxpayer — no extra SA claim needed.</Text>
               )}
             </>
           )}
@@ -321,6 +324,12 @@ const styles = StyleSheet.create({
   },
   freeTag: { color: colors.primary, fontWeight: '600' },
   freeNote: { fontSize: font.sizes.xs, color: colors.primary, marginTop: 2 },
+  sectionDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
+  expandLink: {
+    color: colors.primary,
+    fontSize: font.sizes.sm,
+    paddingVertical: spacing.xs,
+  },
   reliefBox: {
     backgroundColor: colors.primaryMuted,
     borderRadius: radius.md,
