@@ -41,6 +41,7 @@ export function MainScreen({
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
   const [showPension, setShowPension] = React.useState(false);
+  const [shareState, setShareState] = React.useState<'idle' | 'copied'>('idle');
 
   const newAnnual = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
@@ -111,6 +112,30 @@ export function MainScreen({
   const current = newResult?.[resultPeriod];
   const hasOld = !!oldResult;
 
+  async function handleShare() {
+    if (!current) return;
+    const suffix: Record<Period, string> = { annual: '/yr', monthly: '/mo', weekly: '/wk', daily: '/day', hourly: '/hr' };
+    const s = suffix[resultPeriod];
+    const text = [
+      'UK Take-Home Pay',
+      `Gross: ${formatCurrency(current.grossSalary)}${s}`,
+      `Income Tax: ${formatCurrency(current.incomeTax)}${s}`,
+      `NI: ${formatCurrency(current.nationalInsurance)}${s}`,
+      `Take Home: ${formatCurrency(current.takeHome)}${s}`,
+      '',
+      'Calculated with UK Salary Tax Calculator: https://lukecode99.github.io/uk-salary-tax-calculator/',
+    ].join('\n');
+    if ((navigator as any).share) {
+      try { await (navigator as any).share({ text }); } catch {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        setShareState('copied');
+        setTimeout(() => setShareState('idle'), 2000);
+      } catch {}
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
@@ -169,6 +194,7 @@ export function MainScreen({
 
           {/* Results */}
           {current && (
+            <>
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>Results</Text>
               <PeriodSelector value={resultPeriod} onChange={setResultPeriod} />
@@ -222,6 +248,12 @@ export function MainScreen({
                 </View>
               )}
             </View>
+            <TouchableOpacity style={styles.shareButton} onPress={handleShare} activeOpacity={0.8}>
+              <Text style={styles.shareButtonText}>
+                {shareState === 'copied' ? '✓ Copied!' : '↗ Share'}
+              </Text>
+            </TouchableOpacity>
+            </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -321,5 +353,17 @@ const styles = StyleSheet.create({
     fontSize: font.sizes.sm,
     fontWeight: '500',
     lineHeight: 18,
+  },
+  shareButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    alignSelf: 'center',
+  },
+  shareButtonText: {
+    color: '#0D0D0D',
+    fontSize: font.sizes.sm,
+    fontWeight: '700',
   },
 });
