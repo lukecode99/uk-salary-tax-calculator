@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
-import { TAX_YEAR } from '../engine/taxRates';
+import { RATES, TaxYear } from '../engine/taxRates';
 import { colors, spacing, radius, font } from '../theme';
 import { AdBanner } from '../components/AdBanner';
 
@@ -13,7 +13,10 @@ function Section({ title, children }: { title: string; children: string }) {
   );
 }
 
-export function HelpScreen() {
+const gbp = (n: number) => `£${n.toLocaleString('en-GB')}`;
+
+export function HelpScreen({ taxYear }: { taxYear: TaxYear }) {
+  const sl = RATES[taxYear].studentLoan;
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -21,7 +24,7 @@ export function HelpScreen() {
 
         <View style={styles.card}>
           <Section title="Tax year">
-            {`This calculator uses ${TAX_YEAR} UK tax rates for England, Wales, Northern Ireland, and Scotland. It is for indicative purposes only — for completing tax returns please consult a tax professional.`}
+            {`This calculator uses ${taxYear} UK tax rates for England, Wales, Northern Ireland, and Scotland. You can switch tax year in Settings. It is for indicative purposes only — for completing tax returns please consult a tax professional.`}
           </Section>
 
           <View style={styles.divider} />
@@ -45,7 +48,7 @@ export function HelpScreen() {
           <View style={styles.divider} />
 
           <Section title="Student Loans">
-            {`Repayments are 9% of income above the threshold:\n• Plan 1: £24,990\n• Plan 2: £27,295\n• Plan 4 (Scotland): £31,395\n• Plan 5: £25,000\n• Postgraduate: 6% above £21,000`}
+            {`Repayments are 9% of income above the threshold (${taxYear}):\n• Plan 1: ${gbp(sl.plan1.threshold)}\n• Plan 2: ${gbp(sl.plan2.threshold)}\n• Plan 4 (Scotland): ${gbp(sl.plan4.threshold)}\n• Plan 5: ${gbp(sl.plan5.threshold)}\n• Postgraduate: 6% above ${gbp(sl.postgrad.threshold)}`}
           </Section>
         </View>
       </ScrollView>

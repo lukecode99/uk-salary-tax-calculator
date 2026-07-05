@@ -63,34 +63,33 @@ function NumInput({ value, onChange, placeholder }: { value: number; onChange: (
   );
 }
 
-// BiK rate lookup for common CO2 bands (2025/26)
+// BiK rate lookup for common CO2 bands (2026/27)
 function bikRateForCO2(co2: number): number {
-  if (co2 === 0) return 3;          // pure electric
-  if (co2 <= 50) return 5;          // ULEV / plug-in hybrid
-  if (co2 <= 54) return 15;
-  if (co2 <= 59) return 16;
-  if (co2 <= 64) return 17;
-  if (co2 <= 69) return 18;
-  if (co2 <= 74) return 19;
-  if (co2 <= 79) return 20;
-  if (co2 <= 84) return 21;
-  if (co2 <= 89) return 22;
-  if (co2 <= 94) return 23;
-  if (co2 <= 99) return 24;
-  if (co2 <= 104) return 25;
-  if (co2 <= 109) return 26;
-  if (co2 <= 114) return 27;
-  if (co2 <= 119) return 28;
-  if (co2 <= 124) return 29;
-  if (co2 <= 129) return 30;
-  if (co2 <= 134) return 31;
-  if (co2 <= 139) return 32;
-  if (co2 <= 144) return 33;
-  if (co2 <= 149) return 34;
-  if (co2 <= 154) return 35;
-  if (co2 <= 159) return 36;
-  if (co2 <= 164) return 37;
-  return 37; // cap at 37%
+  if (co2 === 0) return 4;          // pure electric
+  if (co2 <= 50) return 6;          // ULEV / plug-in hybrid
+  if (co2 <= 54) return 16;
+  if (co2 <= 59) return 17;
+  if (co2 <= 64) return 18;
+  if (co2 <= 69) return 19;
+  if (co2 <= 74) return 20;
+  if (co2 <= 79) return 21;
+  if (co2 <= 84) return 22;
+  if (co2 <= 89) return 23;
+  if (co2 <= 94) return 24;
+  if (co2 <= 99) return 25;
+  if (co2 <= 104) return 26;
+  if (co2 <= 109) return 27;
+  if (co2 <= 114) return 28;
+  if (co2 <= 119) return 29;
+  if (co2 <= 124) return 30;
+  if (co2 <= 129) return 31;
+  if (co2 <= 134) return 32;
+  if (co2 <= 139) return 33;
+  if (co2 <= 144) return 34;
+  if (co2 <= 149) return 35;
+  if (co2 <= 154) return 36;
+  if (co2 <= 159) return 37;
+  return 38; // cap at 38%
 }
 
 interface CarSectionProps {
@@ -172,7 +171,7 @@ function CarSection({ car, annualSalary, onUpdate }: CarSectionProps) {
                   value={car.bikRate > 0 ? String(car.bikRate) : ''}
                   placeholder="0"
                   placeholderTextColor={colors.textMuted}
-                  onChangeText={(t) => { const n = parseFloat(t); if (!isNaN(n) && n >= 0 && n <= 37) onUpdate({ bikRate: n }); }}
+                  onChangeText={(t) => { const n = parseFloat(t); if (!isNaN(n) && n >= 0 && n <= 38) onUpdate({ bikRate: n }); }}
                 />
                 <Text style={styles.pct}>%</Text>
               </View>

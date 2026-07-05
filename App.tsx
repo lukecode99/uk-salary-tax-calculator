@@ -91,11 +91,9 @@ export default function App() {
           {() => <SettingsScreen settings={settings} onChange={setSettings} />}
         </Tab.Screen>
 
-        <Tab.Screen
-          name="Help"
-          component={HelpScreen}
-          options={{ tabBarLabel: 'Help' }}
-        />
+        <Tab.Screen name="Help" options={{ tabBarLabel: 'Help' }}>
+          {() => <HelpScreen taxYear={settings.taxYear} />}
+        </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
   );

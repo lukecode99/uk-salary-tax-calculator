@@ -106,8 +106,9 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
       payeEmployer,
       privateGross,
       settings.scottishRates,
+      settings.taxYear,
     );
-  }, [annualSalary, payeEmployee, payeEmployer, privateGross, settings.scottishRates]);
+  }, [annualSalary, payeEmployee, payeEmployer, privateGross, settings.scottishRates, settings.taxYear]);
 
   const hasSalary = annualSalary > 0;
   const hasSaClaim = result && (result.privateSaClaim > 0 || result.payeSaClaim > 0);

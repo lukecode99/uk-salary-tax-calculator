@@ -1,8 +1,12 @@
 import {
   ENGLAND_WALES_NI,
-  SCOTLAND,
   NATIONAL_INSURANCE,
-  STUDENT_LOAN,
+  EMPLOYER_NI,
+  RATES,
+  RateSet,
+  TaxYear,
+  defaultTaxYear,
+  ScottishBand,
   PENSION_BASIC_RATE_RELIEF,
 } from './taxRates';
 
@@ -17,6 +21,8 @@ export interface TaxInputs {
   privateContrib?: number;      // annual £ private pension gross contribution
   totalSalaryScrifice?: number; // annual £ total salary sacrifice (car, bike, etc.)
   carBiKValue?: number;         // annual taxable BiK value (P11D × rate) — adds to income tax only
+  employerPensionContrib?: number; // annual £ employer pension (for cost-to-employer)
+  taxYear?: TaxYear;            // defaults to the current tax year
   scottishRates: boolean;
   studentLoan: StudentLoanPlan;
   payNI: boolean;
@@ -41,8 +47,12 @@ export interface TaxResult {
   nationalInsurance: number;
   studentLoanRepayment: number;
   privatePension: number;
+  salarySacrifice: number;     // annual £ sacrificed (car, bike, etc.)
   carBiKTaxableValue: number;  // annual BiK value for display
   carBiKTax: number;           // income tax attributable to the BiK
+  employerNI: number;          // employer's Class 1 secondary NI
+  employerPension: number;     // employer pension contribution
+  employerCost: number;        // gross + employer NI + employer pension
   takeHome: number;
 }
 
@@ -58,7 +68,7 @@ export interface FullPensionResult {
   // PAYE pension
   payeEmployee: number;
   payeEmployer: number;
-  payeAutoSaving: number;       // income tax saved (marginal rate × employee contrib)
+  payeAutoSaving: number;       // income tax saved (tax without contrib − tax with)
   payeSaClaim: number;          // extra SA claim for HR/AR beyond basic 20%
   // Private pension (relief at source)
   privateGross: number;         // gross contribution going in
@@ -79,12 +89,14 @@ function calcPersonalAllowance(adjustedIncome: number): number {
   return Math.max(0, personalAllowance - reduction);
 }
 
-// Pass actual PA so band limits are correct when PA is tapered
-function calcIncomeTaxEngland(taxableIncome: number, pa: number): number {
+// Bands are fixed spans of TAXABLE income — they do not expand when the PA
+// tapers. Basic = first £37,700 taxable; higher = £37,701–£125,140 taxable;
+// additional above (PA is always £0 by the time taxable exceeds £125,140).
+function calcIncomeTaxEngland(taxableIncome: number): number {
   if (taxableIncome <= 0) return 0;
-  const { basicRateLimit, higherRateLimit, basicRate, higherRate, additionalRate } = ENGLAND_WALES_NI;
-  const basicBandSize = basicRateLimit - pa;
-  const higherBandMax = higherRateLimit - pa;
+  const { personalAllowance, basicRateLimit, higherRateLimit, basicRate, higherRate, additionalRate } = ENGLAND_WALES_NI;
+  const basicBandSize = basicRateLimit - personalAllowance; // 37,700
+  const higherBandMax = higherRateLimit;                    // 125,140 of taxable income
 
   if (taxableIncome <= basicBandSize) {
     return taxableIncome * basicRate;
@@ -97,18 +109,31 @@ function calcIncomeTaxEngland(taxableIncome: number, pa: number): number {
   }
 }
 
-function calcIncomeTaxScotland(grossIncome: number, pa: number): number {
-  const taxableIncome = Math.max(0, grossIncome - pa);
-  if (taxableIncome <= 0) return 0;
+// Scottish bands apply as fixed WIDTHS of taxable income (starter = first
+// £3,967 taxable, basic = next £12,989, ...) so income between a tapered PA
+// and £12,570 gross is still banded.
+function calcIncomeTaxScotland(grossIncome: number, pa: number, bands: ScottishBand[]): number {
+  let remaining = Math.max(0, grossIncome - pa);
+  if (remaining <= 0) return 0;
 
   let tax = 0;
-  for (const band of SCOTLAND.bands) {
-    const bandIncome = Math.min(taxableIncome + pa, band.to) - Math.max(pa, band.from);
-    if (bandIncome > 0) {
-      tax += bandIncome * band.rate;
-    }
+  for (const band of bands) {
+    const width = band.to === Infinity ? Infinity : band.to - band.from;
+    const slice = Math.min(remaining, width);
+    tax += slice * band.rate;
+    remaining -= slice;
+    if (remaining <= 0) break;
   }
   return tax;
+}
+
+// Income tax on a given adjusted gross (PA computed from it) — the single
+// entry point used for delta comparisons (BiK tax, pension saving).
+function calcIncomeTax(adjustedGross: number, scottishRates: boolean, rates: RateSet): number {
+  const pa = calcPersonalAllowance(adjustedGross);
+  return scottishRates
+    ? calcIncomeTaxScotland(adjustedGross, pa, rates.scotlandBands)
+    : calcIncomeTaxEngland(Math.max(0, adjustedGross - pa));
 }
 
 function calcNI(grossSalary: number, ageGroup: AgeGroup, payNI: boolean): number {
@@ -122,9 +147,16 @@ function calcNI(grossSalary: number, ageGroup: AgeGroup, payNI: boolean): number
     (grossSalary - upperEarningsLimit) * upperRate;
 }
 
-function calcStudentLoan(grossSalary: number, plan: StudentLoanPlan): number {
+// Employer Class 1 secondary NI: 15% on everything above the £5,000
+// secondary threshold (no upper limit). Sacrifice reduces NIable pay.
+function calcEmployerNI(niableEarnings: number): number {
+  const { secondaryThreshold, rate } = EMPLOYER_NI;
+  return Math.max(0, niableEarnings - secondaryThreshold) * rate;
+}
+
+function calcStudentLoan(grossSalary: number, plan: StudentLoanPlan, rates: RateSet): number {
   if (plan === 'none') return 0;
-  const config = STUDENT_LOAN[plan];
+  const config = rates.studentLoan[plan];
   if (grossSalary <= config.threshold) return 0;
   return (grossSalary - config.threshold) * config.rate;
 }
@@ -134,38 +166,19 @@ function calcMarginalRate(
   scottishRates: boolean,
   pa: number,
   adjustedGross: number,
+  rates: RateSet,
 ): number {
   if (scottishRates) {
-    for (let i = SCOTLAND.bands.length - 1; i >= 0; i--) {
-      if (adjustedGross > SCOTLAND.bands[i].from) return SCOTLAND.bands[i].rate;
+    const bands = rates.scotlandBands;
+    for (let i = bands.length - 1; i >= 0; i--) {
+      if (adjustedGross > bands[i].from) return bands[i].rate;
     }
     return 0;
   }
-  const { basicRateLimit, higherRateLimit, basicRate, higherRate, additionalRate } = ENGLAND_WALES_NI;
-  if (taxableIncome <= basicRateLimit - pa) return basicRate;
-  if (taxableIncome <= higherRateLimit - pa) return higherRate;
+  const { personalAllowance, basicRateLimit, higherRateLimit, basicRate, higherRate, additionalRate } = ENGLAND_WALES_NI;
+  if (taxableIncome <= basicRateLimit - personalAllowance) return basicRate;
+  if (taxableIncome <= higherRateLimit) return higherRate;
   return additionalRate;
-}
-
-function calcPensionBreakdown(
-  payeContrib: number,
-  taxableIncome: number,
-  scottishRates: boolean,
-  pa: number,
-  adjustedGross: number,
-): PensionBreakdown {
-  if (payeContrib === 0) {
-    return { employeeContrib: 0, autoTaxSaving: 0, selfAssessmentClaim: 0, effectiveCost: 0 };
-  }
-  const marginalRate = calcMarginalRate(taxableIncome, scottishRates, pa, adjustedGross);
-  // PAYE net pay: full marginal rate relief is automatic — no SA claim needed
-  const autoTaxSaving = payeContrib * marginalRate;
-  return {
-    employeeContrib: payeContrib,
-    autoTaxSaving,
-    selfAssessmentClaim: 0,
-    effectiveCost: payeContrib - autoTaxSaving,
-  };
 }
 
 export function calculateFullPension(
@@ -174,14 +187,19 @@ export function calculateFullPension(
   payeEmployerContrib: number,
   privateGrossContrib: number,
   scottishRates: boolean,
+  taxYear?: TaxYear,
 ): FullPensionResult {
+  const rates = RATES[taxYear ?? defaultTaxYear()];
   const adjustedGross = grossSalary - payeContrib;
   const pa = calcPersonalAllowance(adjustedGross);
   const taxableIncome = Math.max(0, adjustedGross - pa);
-  const marginalRate = calcMarginalRate(taxableIncome, scottishRates, pa, adjustedGross);
+  const marginalRate = calcMarginalRate(taxableIncome, scottishRates, pa, adjustedGross, rates);
 
-  // PAYE: full saving at marginal rate (net pay arrangement — saving is automatic)
-  const payeAutoSaving = payeContrib * marginalRate;
+  // PAYE net pay: saving = tax without the contribution minus tax with it
+  // (delta method — captures PA-taper effects a single marginal rate misses)
+  const payeAutoSaving = payeContrib > 0
+    ? calcIncomeTax(grossSalary, scottishRates, rates) - calcIncomeTax(adjustedGross, scottishRates, rates)
+    : 0;
   // No SA claim for PAYE net pay — saving already happens automatically
   const payeSaClaim = 0;
 
@@ -214,6 +232,8 @@ export function calculate(inputs: TaxInputs): TaxResult {
   const privateContrib = inputs.privateContrib ?? 0;
   const totalSacrifice = inputs.totalSalaryScrifice ?? 0;
   const biKValue = inputs.carBiKValue ?? 0;
+  const employerPension = inputs.employerPensionContrib ?? 0;
+  const rates = RATES[inputs.taxYear ?? defaultTaxYear()];
 
   // Salary sacrifice + PAYE pension reduce taxable gross; BiK adds to it for income tax only
   const adjustedGross = grossSalary - payeContrib - totalSacrifice;
@@ -221,21 +241,30 @@ export function calculate(inputs: TaxInputs): TaxResult {
   const pa = calcPersonalAllowance(adjustedGrossWithBiK);
   const taxableIncome = Math.max(0, adjustedGrossWithBiK - pa);
 
-  const incomeTax = scottishRates
-    ? calcIncomeTaxScotland(adjustedGrossWithBiK, pa)
-    : calcIncomeTaxEngland(taxableIncome, pa);
+  const incomeTax = calcIncomeTax(adjustedGrossWithBiK, scottishRates, rates);
 
   // BiK tax = tax difference attributable to the BiK benefit
-  const taxableIncomeWithoutBiK = Math.max(0, adjustedGross - calcPersonalAllowance(adjustedGross));
-  const incomeTaxWithoutBiK = scottishRates
-    ? calcIncomeTaxScotland(adjustedGross, calcPersonalAllowance(adjustedGross))
-    : calcIncomeTaxEngland(taxableIncomeWithoutBiK, calcPersonalAllowance(adjustedGross));
-  const carBiKTax = incomeTax - incomeTaxWithoutBiK;
+  const carBiKTax = incomeTax - calcIncomeTax(adjustedGross, scottishRates, rates);
 
-  // NI: sacrifice reduces NIable earnings; BiK does NOT attract employee NI
+  // NI and student loan: sacrifice reduces NIable/repayable earnings; BiK attracts neither
   const nationalInsurance = calcNI(grossSalary - totalSacrifice, ageGroup, payNI);
-  const studentLoanRepayment = calcStudentLoan(grossSalary, studentLoan);
-  const pension = calcPensionBreakdown(payeContrib, taxableIncomeWithoutBiK, scottishRates, calcPersonalAllowance(adjustedGross), adjustedGross);
+  const studentLoanRepayment = calcStudentLoan(grossSalary - totalSacrifice, studentLoan, rates);
+
+  // Pension saving via delta: tax on the same basis without the PAYE
+  // contribution minus tax with it (BiK included in both legs)
+  const autoTaxSaving = payeContrib > 0
+    ? calcIncomeTax(adjustedGrossWithBiK + payeContrib, scottishRates, rates) - incomeTax
+    : 0;
+  const pension: PensionBreakdown = {
+    employeeContrib: payeContrib,
+    autoTaxSaving,
+    selfAssessmentClaim: 0, // PAYE net pay — full relief is automatic
+    effectiveCost: payeContrib - autoTaxSaving,
+  };
+
+  // Cost to employer: gross pay + employer NI on post-sacrifice pay + employer pension
+  const employerNI = calcEmployerNI(grossSalary - totalSacrifice);
+  const employerCost = grossSalary + employerNI + employerPension;
 
   const takeHome = grossSalary - payeContrib - totalSacrifice - incomeTax - nationalInsurance - studentLoanRepayment;
   const adjustedNetIncome = grossSalary - payeContrib - totalSacrifice - privateContrib;
@@ -249,8 +278,12 @@ export function calculate(inputs: TaxInputs): TaxResult {
     nationalInsurance,
     studentLoanRepayment,
     privatePension: privateContrib,
+    salarySacrifice: totalSacrifice,
     carBiKTaxableValue: biKValue,
     carBiKTax,
+    employerNI,
+    employerPension,
+    employerCost,
     takeHome,
   };
 }
@@ -273,8 +306,12 @@ export function toPeriodResult(annual: TaxResult, hoursPerWeek: number, daysPerW
       nationalInsurance: r.nationalInsurance * f,
       studentLoanRepayment: r.studentLoanRepayment * f,
       privatePension: r.privatePension * f,
+      salarySacrifice: r.salarySacrifice * f,
       carBiKTaxableValue: r.carBiKTaxableValue * f,
       carBiKTax: r.carBiKTax * f,
+      employerNI: r.employerNI * f,
+      employerPension: r.employerPension * f,
+      employerCost: r.employerCost * f,
       takeHome: r.takeHome * f,
     };
   }

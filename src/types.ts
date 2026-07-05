@@ -1,4 +1,5 @@
 import { StudentLoanPlan, AgeGroup, Period } from './engine/taxEngine';
+import { TaxYear, defaultTaxYear } from './engine/taxRates';
 
 export type PensionMode = 'percent' | 'fixed' | 'monthly';
 export type SacrificeMode = 'fixed' | 'monthly'; // £/yr or £/mo only (no % for sacrifice)
@@ -33,6 +34,7 @@ export interface PensionSettings {
 export interface AppSettings {
   pension: PensionSettings;
   sacrifice: SalaryScrificeSettings;
+  taxYear: TaxYear;
   scottishRates: boolean;
   studentLoan: StudentLoanPlan;
   payNI: boolean;
@@ -68,6 +70,7 @@ export const DEFAULT_SACRIFICE: SalaryScrificeSettings = {
 export const DEFAULT_SETTINGS: AppSettings = {
   pension: DEFAULT_PENSION,
   sacrifice: DEFAULT_SACRIFICE,
+  taxYear: defaultTaxYear(),
   scottishRates: false,
   studentLoan: 'none',
   payNI: true,

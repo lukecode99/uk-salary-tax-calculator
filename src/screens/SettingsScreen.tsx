@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { AppSettings } from '../types';
 import { StudentLoanPlan, AgeGroup } from '../engine/taxEngine';
+import { TAX_YEARS, TaxYear } from '../engine/taxRates';
 import { colors, spacing, radius, font } from '../theme';
 import { AdBanner } from '../components/AdBanner';
 
@@ -97,6 +98,9 @@ const AGE_OPTIONS: { label: string; value: AgeGroup }[] = [
   { label: '75+', value: 'over75' },
 ];
 
+const YEAR_OPTIONS: { label: string; value: TaxYear }[] =
+  TAX_YEARS.map((y) => ({ label: y, value: y }));
+
 const LOAN_OPTIONS: { label: string; value: StudentLoanPlan }[] = [
   { label: 'None', value: 'none' },
   { label: 'Plan 1', value: 'plan1' },
@@ -117,6 +121,15 @@ export function SettingsScreen({ settings, onChange }: Props) {
         <Text style={styles.title}>Settings</Text>
 
         <View style={styles.card}>
+          <Row label="Tax year" column>
+            <PillGrid
+              options={YEAR_OPTIONS}
+              value={settings.taxYear}
+              onChange={(v) => set('taxYear', v)}
+              columns={2}
+            />
+          </Row>
+          <View style={styles.divider} />
           <Row label="Hours per week">
             <NumericInput value={settings.hoursPerWeek} onChange={(v) => set('hoursPerWeek', v)} />
           </Row>

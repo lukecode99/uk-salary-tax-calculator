@@ -60,11 +60,41 @@ export function MainScreen({
     return pensionAnnual(annualGross, p.payeEmployeeMode, p.payeEmployeeValue);
   }
 
+  function getPrivateContrib(annualGross: number): number {
+    const p = settings.pension;
+    if (!p.privateEnabled || p.privateValue === 0) return 0;
+    return p.privateMode === 'percent' ? annualGross * (p.privateValue / 100) : p.privateValue;
+  }
+
+  function getEmployerPension(annualGross: number): number {
+    const p = settings.pension;
+    if (!p.payeEnabled) return 0;
+    return pensionAnnual(annualGross, p.payeEmployerMode, p.payeEmployerValue);
+  }
+
+  const totalSacrifice = useMemo(() => {
+    const s = settings.sacrifice;
+    const car = s.car.enabled ? (s.car.mode === 'monthly' ? s.car.value * 12 : s.car.value) : 0;
+    const bike = s.bike.enabled ? (s.bike.mode === 'monthly' ? s.bike.value * 12 : s.bike.value) : 0;
+    return car + bike;
+  }, [settings.sacrifice]);
+
+  const carBiKValue = useMemo(() => {
+    const car = settings.sacrifice.car;
+    if (!car.enabled || car.p11dValue <= 0 || car.bikRate <= 0) return 0;
+    return car.p11dValue * (car.bikRate / 100);
+  }, [settings.sacrifice.car]);
+
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
       grossSalary: newAnnual,
       payeContrib: getPayeContrib(newAnnual),
+      privateContrib: getPrivateContrib(newAnnual),
+      totalSalaryScrifice: totalSacrifice,
+      carBiKValue,
+      employerPensionContrib: getEmployerPension(newAnnual),
+      taxYear: settings.taxYear,
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -73,13 +103,18 @@ export function MainScreen({
       daysPerWeek: settings.daysPerWeek,
     });
     return toPeriodResult(annual, settings.hoursPerWeek, settings.daysPerWeek);
-  }, [newAnnual, settings]);
+  }, [newAnnual, settings, totalSacrifice, carBiKValue]);
 
   const oldResult = useMemo(() => {
     if (oldAnnual === null) return null;
     const annual = calculate({
       grossSalary: oldAnnual,
       payeContrib: getPayeContrib(oldAnnual),
+      privateContrib: getPrivateContrib(oldAnnual),
+      totalSalaryScrifice: totalSacrifice,
+      carBiKValue,
+      employerPensionContrib: getEmployerPension(oldAnnual),
+      taxYear: settings.taxYear,
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
       payNI: settings.payNI,
@@ -88,7 +123,7 @@ export function MainScreen({
       daysPerWeek: settings.daysPerWeek,
     });
     return toPeriodResult(annual, settings.hoursPerWeek, settings.daysPerWeek);
-  }, [oldAnnual, settings]);
+  }, [oldAnnual, settings, totalSacrifice, carBiKValue]);
 
   const privateSaClaim = useMemo(() => {
     if (newAnnual === null) return 0;
@@ -97,9 +132,37 @@ export function MainScreen({
     const privateGross = p.privateMode === 'percent' ? newAnnual * (p.privateValue / 100) : p.privateValue;
     const payeEmp = getPayeContrib(newAnnual);
     const payeEmpR = p.payeEnabled ? (p.payeEmployerMode === 'percent' ? newAnnual * (p.payeEmployerValue / 100) : p.payeEmployerValue) : 0;
-    const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates);
+    const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates, settings.taxYear);
     return full.privateSaClaim;
   }, [newAnnual, settings]);
+
+  // PA-restore optimiser (ST-7): adjusted net income between £100k and
+  // £125,140 sits in the 60% taper zone — an extra contribution of
+  // (adjusted − 100,000) restores the full Personal Allowance.
+  const paRestoreHint = useMemo(() => {
+    if (newAnnual === null) return null;
+    const payeContrib = getPayeContrib(newAnnual);
+    const adjusted = newAnnual - payeContrib - totalSacrifice + carBiKValue;
+    if (adjusted <= 100000 || adjusted > 125140) return null;
+    const topUp = adjusted - 100000;
+    const base = {
+      grossSalary: newAnnual,
+      payeContrib,
+      totalSalaryScrifice: totalSacrifice,
+      carBiKValue,
+      taxYear: settings.taxYear,
+      scottishRates: settings.scottishRates,
+      studentLoan: settings.studentLoan,
+      payNI: settings.payNI,
+      ageGroup: settings.ageGroup,
+      hoursPerWeek: settings.hoursPerWeek,
+      daysPerWeek: settings.daysPerWeek,
+    } as const;
+    const now = calculate(base);
+    const restored = calculate({ ...base, payeContrib: payeContrib + topUp });
+    const saving = now.incomeTax - restored.incomeTax;
+    return { topUp, pct: Math.round((saving / topUp) * 100) };
+  }, [newAnnual, settings, totalSacrifice, carBiKValue]);
 
   function diff(key: keyof TaxResult): number | null {
     if (!newResult || !oldResult) return null;
@@ -122,7 +185,7 @@ export function MainScreen({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title} adjustsFontSizeToFit numberOfLines={1}>UK Salary & Tax Calculator 2026</Text>
+          <Text style={styles.title} adjustsFontSizeToFit numberOfLines={1}>{`UK Salary & Tax Calculator ${settings.taxYear}`}</Text>
 
           {/* Salary inputs */}
           <View style={styles.card}>
@@ -189,7 +252,12 @@ export function MainScreen({
                   </TouchableOpacity>
                   {showPension && (
                     <View style={styles.pensionBox}>
-                      <ResultRow label="Auto tax saving (20%)" value={current.pension.autoTaxSaving} indent dimmed />
+                      <ResultRow
+                        label={`Auto tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
+                        value={current.pension.autoTaxSaving}
+                        indent
+                        dimmed
+                      />
                       {current.pension.selfAssessmentClaim > 0 && (
                         <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
                       )}
@@ -199,8 +267,14 @@ export function MainScreen({
                 </>
               )}
 
+              {current.salarySacrifice > 0 && (
+                <ResultRow label="Salary Sacrifice" value={current.salarySacrifice} />
+              )}
               <ResultRow label="Taxable Income" value={current.taxableIncome} />
               <ResultRow label="Income Tax" value={current.incomeTax} />
+              {current.carBiKTax > 0 && (
+                <ResultRow label="of which car BiK tax" value={current.carBiKTax} indent dimmed />
+              )}
               <ResultRow label="National Insurance" value={current.nationalInsurance} />
               {current.studentLoanRepayment > 0 && (
                 <ResultRow label="Student Loan" value={current.studentLoanRepayment} />
@@ -221,6 +295,29 @@ export function MainScreen({
                   </Text>
                 </View>
               )}
+
+              {paRestoreHint && (
+                <View style={styles.saNote}>
+                  <Text style={styles.saNoteText}>
+                    💡 Contribute {formatCurrency(paRestoreHint.topUp)} to your pension to restore your Personal Allowance — effective relief {paRestoreHint.pct}%.
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Cost to employer */}
+          {current && (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Cost to Employer</Text>
+              <View style={styles.divider} />
+              <ResultRow label="Gross Salary" value={current.grossSalary} />
+              <ResultRow label="Employer NI (15%)" value={current.employerNI} />
+              {current.employerPension > 0 && (
+                <ResultRow label="Employer Pension" value={current.employerPension} />
+              )}
+              <View style={styles.divider} />
+              <ResultRow label="Total Cost" value={current.employerCost} bold />
             </View>
           )}
         </ScrollView>

@@ -1,8 +1,10 @@
 import { calculate, toPeriodResult, TaxInputs, calculateFullPension } from '../taxEngine';
+import { defaultTaxYear } from '../taxRates';
 
 const base: TaxInputs = {
   grossSalary: 0,
   payeContrib: 0,
+  taxYear: '2026/27',
   scottishRates: false,
   studentLoan: 'none',
   payNI: true,
@@ -63,29 +65,43 @@ describe('Income Tax — England', () => {
     expect(r2(res.incomeTax)).toBe(r2(37700 * 0.20 + 9730 * 0.40));
   });
 
-  test('tapered PA at £120,000 — no additional rate', () => {
+  test('tapered PA at £120,000 — basic band stays £37,700', () => {
     const res = calculate({ ...base, grossSalary: 120000 });
-    // PA = 12570 - 10000 = 2570; adjustedGross = 120000; taxable = 117430
-    // basicBandSize = 50270 - 2570 = 47700
-    // higherBandMax = 125140 - 2570 = 122570
-    // 117430 < 122570 → higher rate only
-    const pa = 2570;
-    const taxable = 120000 - pa;
-    const basicSize = 50270 - pa;
-    const expected = basicSize * 0.20 + (taxable - basicSize) * 0.40;
+    // PA = 12570 - 10000 = 2570; taxable = 117430
+    // Bands are fixed spans of taxable income — the basic band does NOT
+    // expand as the PA tapers.
+    // basic:  37700 × 20% = 7540
+    // higher: (117430 - 37700) × 40% = 31892
+    const expected = 37700 * 0.20 + (117430 - 37700) * 0.40;
     expect(r2(res.incomeTax)).toBe(r2(expected));
   });
 
   test('additional rate at £150,000 (PA fully withdrawn)', () => {
     const res = calculate({ ...base, grossSalary: 150000 });
     // PA = 0; taxable = 150000
-    // basicBandSize = basicRateLimit - pa = 50270 - 0 = 50270
-    // higherBandMax = 125140 - 0 = 125140
-    // basic:    50270 × 20%   = 10054
-    // higher:   74870 × 40%   = 29948
-    // additional: 24860 × 45% = 11187
-    const expected = 50270 * 0.20 + 74870 * 0.40 + (150000 - 125140) * 0.45;
+    // basic:      37700 × 20% = 7540
+    // higher:     (125140 - 37700) × 40% = 34976
+    // additional: (150000 - 125140) × 45% = 11187
+    const expected = 37700 * 0.20 + 87440 * 0.40 + (150000 - 125140) * 0.45;
     expect(r2(res.incomeTax)).toBe(r2(expected));
+  });
+
+  test('£130,000 → income tax £44,703.00 (acceptance)', () => {
+    const res = calculate({ ...base, grossSalary: 130000 });
+    expect(r2(res.incomeTax)).toBe(44703.00);
+    expect(r2(res.nationalInsurance)).toBe(4610.60);
+    expect(r2(res.takeHome)).toBe(80686.40);
+  });
+
+  test('£110,000 → income tax £33,432.00 (acceptance)', () => {
+    const res = calculate({ ...base, grossSalary: 110000 });
+    expect(r2(res.incomeTax)).toBe(33432.00);
+  });
+
+  test('£100k → £110k marginal income tax = £6,000 (60% zone)', () => {
+    const at100 = calculate({ ...base, grossSalary: 100000 });
+    const at110 = calculate({ ...base, grossSalary: 110000 });
+    expect(r2(at110.incomeTax - at100.incomeTax)).toBe(6000.00);
   });
 });
 
@@ -125,19 +141,30 @@ describe('National Insurance', () => {
 
 // ─── Student Loan ──────────────────────────────────────────────────────────
 describe('Student Loan', () => {
-  test('Plan 1 repayment at £35,000', () => {
+  test('Plan 1 repayment at £35,000 → £729.00', () => {
     const res = calculate({ ...base, grossSalary: 35000, studentLoan: 'plan1' });
-    expect(r2(res.studentLoanRepayment)).toBe(r2((35000 - 24990) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(r2((35000 - 26900) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(729.00);
   });
 
-  test('Plan 2 repayment at £35,000', () => {
+  test('Plan 2 repayment at £35,000 → £505.35 (£42.11/mo)', () => {
     const res = calculate({ ...base, grossSalary: 35000, studentLoan: 'plan2' });
-    expect(r2(res.studentLoanRepayment)).toBe(r2((35000 - 27295) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(r2((35000 - 29385) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(505.35);
+    const periods = toPeriodResult(res, 37.5, 5);
+    expect(r2(periods.monthly.studentLoanRepayment)).toBe(42.11);
   });
 
-  test('Plan 4 repayment at £40,000', () => {
+  test('Plan 4 repayment at £40,000 → £558.45', () => {
     const res = calculate({ ...base, grossSalary: 40000, studentLoan: 'plan4' });
-    expect(r2(res.studentLoanRepayment)).toBe(r2((40000 - 31395) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(r2((40000 - 33795) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(558.45);
+  });
+
+  test('student loan uses gross minus salary sacrifice', () => {
+    const res = calculate({ ...base, grossSalary: 60000, studentLoan: 'plan2', totalSalaryScrifice: 6000 });
+    expect(r2(res.studentLoanRepayment)).toBe(r2((54000 - 29385) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(2215.35);
   });
 
   test('Plan 5 repayment', () => {
@@ -181,20 +208,29 @@ describe('PAYE Pension', () => {
     expect(res.pension.selfAssessmentClaim).toBe(0);
   });
 
-  test('higher rate taxpayer has SA claim', () => {
-    // £80k, £4k pension. After pension, marginal rate = 40%
+  test('higher rate taxpayer — net pay gives automatic full relief, no SA claim', () => {
+    // £80k, £4k pension. After pension, marginal rate = 40%.
+    // PAYE net-pay contributions get full marginal relief automatically —
+    // there is nothing extra to claim via self-assessment.
     const res = calculate({ ...base, grossSalary: 80000, payeContrib: 4000 });
-    expect(res.pension.selfAssessmentClaim).toBeGreaterThan(0);
+    expect(res.pension.selfAssessmentClaim).toBe(0);
+    expect(r2(res.pension.autoTaxSaving)).toBe(r2(4000 * 0.40));
   });
 });
 
 // ─── Take-home sanity checks ───────────────────────────────────────────────
 describe('Take-home', () => {
-  test('£30,000 no deductions', () => {
+  test('£30,000 no deductions → £25,119.60', () => {
     const res = calculate({ ...base, grossSalary: 30000 });
     const tax = 17430 * 0.20;
     const ni = 17430 * 0.08;
     expect(r2(res.takeHome)).toBe(r2(30000 - tax - ni));
+    expect(r2(res.takeHome)).toBe(25119.60);
+  });
+
+  test('£60,000 no deductions → £45,357.40', () => {
+    const res = calculate({ ...base, grossSalary: 60000 });
+    expect(r2(res.takeHome)).toBe(45357.40);
   });
 
   test('£50,000 no deductions', () => {
@@ -236,12 +272,12 @@ describe('Period scaling', () => {
 
 // ─── Scottish rates ────────────────────────────────────────────────────────
 describe('Scottish rates', () => {
-  test('Scottish £30,000 tax > English (intermediate 21% > basic 20%)', () => {
+  test('Scottish £30,000 slightly below English (2026/27 wider 19% starter band)', () => {
     const eng = calculate({ ...base, grossSalary: 30000 });
     const sco = calculate({ ...base, grossSalary: 30000, scottishRates: true });
-    // Scottish: Starter 19% on 2306, Basic 20% on 11685, Intermediate 21% on 3439
-    // English: Basic 20% on 17430
-    expect(sco.incomeTax).toBeGreaterThan(eng.incomeTax);
+    // England £3,486 vs Scotland £3,451.07
+    expect(r2(eng.incomeTax)).toBe(3486.00);
+    expect(sco.incomeTax).toBeLessThan(eng.incomeTax);
   });
 
   test('Scottish higher rate is 42% vs English 40%', () => {
@@ -250,13 +286,54 @@ describe('Scottish rates', () => {
     expect(sco.incomeTax).toBeGreaterThan(eng.incomeTax);
   });
 
-  test('Scottish £30,000 exact calculation', () => {
+  test('Scottish £30,000 exact calculation → £3,451.07', () => {
     const res = calculate({ ...base, grossSalary: 30000, scottishRates: true });
-    // Starter: 14876-12570 = 2306 × 19% = 438.14
-    // Basic:  26561-14876 = 11685 × 20% = 2337
-    // Intermediate: 30000-26561 = 3439 × 21% = 722.19
-    const expected = 2306 * 0.19 + 11685 * 0.20 + 3439 * 0.21;
+    // taxable = 17430
+    // Starter:      first 3,967 × 19% = 753.73
+    // Basic:        next 12,989 × 20% = 2,597.80
+    // Intermediate: remaining 474 × 21% = 99.54
+    const expected = 3967 * 0.19 + 12989 * 0.20 + 474 * 0.21;
     expect(r2(res.incomeTax)).toBe(r2(expected));
+    expect(r2(res.incomeTax)).toBe(3451.07);
+  });
+
+  test('Scottish £110,000 → £37,482.05 (tapered PA, band widths on taxable)', () => {
+    const res = calculate({ ...base, grossSalary: 110000, scottishRates: true });
+    // PA = 7570, taxable = 102430
+    // 3967×19% + 12989×20% + 14136×21% + 31338×42% + 40000×45%
+    expect(r2(res.incomeTax)).toBe(37482.05);
+  });
+
+  test('Scottish £13,000 → £81.70 (income between tapered PA anchor and £12,570 is banded)', () => {
+    const res = calculate({ ...base, grossSalary: 13000, scottishRates: true });
+    // taxable = 430, all at starter 19%
+    expect(r2(res.incomeTax)).toBe(81.70);
+  });
+});
+
+// ─── Salary sacrifice & BiK (ST-4) ─────────────────────────────────────────
+describe('Salary sacrifice', () => {
+  test('£60,000 with £6,000 car sacrifice, P11D £25,000 @ 15% BiK', () => {
+    const res = calculate({
+      ...base,
+      grossSalary: 60000,
+      totalSalaryScrifice: 6000,
+      carBiKValue: 25000 * 0.15, // 3750
+    });
+    // adjustedGross = 54000; +BiK = 57750; taxable = 45180
+    // tax = 37700×20% + 7480×40% = 10532
+    expect(r2(res.incomeTax)).toBe(10532.00);
+    // NI on 54000: 37700×8% + 3730×2% = 3090.60
+    expect(r2(res.nationalInsurance)).toBe(3090.60);
+    expect(r2(res.takeHome)).toBe(40377.40);
+  });
+
+  test('zero sacrifice → identical to plain calculation', () => {
+    const plain = calculate({ ...base, grossSalary: 60000 });
+    const zeroed = calculate({ ...base, grossSalary: 60000, totalSalaryScrifice: 0, carBiKValue: 0, privateContrib: 0 });
+    expect(zeroed.incomeTax).toBe(plain.incomeTax);
+    expect(zeroed.nationalInsurance).toBe(plain.nationalInsurance);
+    expect(zeroed.takeHome).toBe(plain.takeHome);
   });
 });
 
@@ -284,5 +361,88 @@ describe('calculateFullPension', () => {
   test('total pot = all contributions combined', () => {
     const res = calculateFullPension(60000, 3000, 1800, 1000, false);
     expect(res.totalPot).toBe(3000 + 1800 + 1000);
+  });
+});
+
+// ─── Tax year selection (ST-5) ─────────────────────────────────────────────
+describe('Tax year selection', () => {
+  test('2025/26 Plan 2 threshold £28,470 → £587.70 at £35,000', () => {
+    const res = calculate({ ...base, grossSalary: 35000, studentLoan: 'plan2', taxYear: '2025/26' });
+    expect(r2(res.studentLoanRepayment)).toBe(r2((35000 - 28470) * 0.09));
+    expect(r2(res.studentLoanRepayment)).toBe(587.70);
+  });
+
+  test('2025/26 Scottish £30,000 (bands 15,397 / 27,491)', () => {
+    const res = calculate({ ...base, grossSalary: 30000, scottishRates: true, taxYear: '2025/26' });
+    // taxable = 17430
+    // Starter:      2,827 (15,397−12,570) × 19% = 537.13
+    // Basic:        12,094 (27,491−15,397) × 20% = 2,418.80
+    // Intermediate: remaining 2,509 × 21%        = 526.89
+    const expected = 2827 * 0.19 + 12094 * 0.20 + 2509 * 0.21;
+    expect(r2(res.incomeTax)).toBe(r2(expected));
+    expect(r2(res.incomeTax)).toBe(3482.82);
+  });
+
+  test('2026/27 figures unchanged when year passed explicitly', () => {
+    const res = calculate({ ...base, grossSalary: 35000, studentLoan: 'plan2', taxYear: '2026/27' });
+    expect(r2(res.studentLoanRepayment)).toBe(505.35);
+  });
+
+  test('defaultTaxYear follows the 6 April boundary', () => {
+    expect(defaultTaxYear(new Date(2026, 3, 5))).toBe('2025/26');  // 5 Apr 2026
+    expect(defaultTaxYear(new Date(2026, 3, 6))).toBe('2026/27');  // 6 Apr 2026
+    expect(defaultTaxYear(new Date(2026, 6, 5))).toBe('2026/27');  // 5 Jul 2026
+  });
+
+  test('defaultTaxYear clamps to latest supported year', () => {
+    expect(defaultTaxYear(new Date(2030, 0, 1))).toBe('2026/27');
+  });
+});
+
+// ─── Cost to employer (ST-6) ───────────────────────────────────────────────
+describe('Cost to employer', () => {
+  test('£60,000 no pension → employer NI £8,250, total £68,250', () => {
+    const res = calculate({ ...base, grossSalary: 60000 });
+    // (60,000 − 5,000) × 15%
+    expect(r2(res.employerNI)).toBe(8250.00);
+    expect(r2(res.employerCost)).toBe(68250.00);
+  });
+
+  test('£60,000 with 3% employer pension → total £70,050', () => {
+    const res = calculate({ ...base, grossSalary: 60000, employerPensionContrib: 1800 });
+    expect(r2(res.employerPension)).toBe(1800.00);
+    expect(r2(res.employerCost)).toBe(70050.00);
+  });
+
+  test('salary sacrifice reduces employer NI', () => {
+    const res = calculate({ ...base, grossSalary: 60000, totalSalaryScrifice: 6000 });
+    expect(r2(res.employerNI)).toBe(r2((54000 - 5000) * 0.15));
+  });
+
+  test('employer cost scales by period', () => {
+    const annual = calculate({ ...base, grossSalary: 60000 });
+    const periods = toPeriodResult(annual, 37.5, 5);
+    expect(r2(periods.monthly.employerCost)).toBe(r2(annual.employerCost / 12));
+  });
+});
+
+// ─── Delta-method pension saving (ST-7) ────────────────────────────────────
+describe('Delta-method pension saving', () => {
+  test('£110,000 with £10,000 pension → saving £6,000 (60% effective)', () => {
+    const res = calculate({ ...base, grossSalary: 110000, payeContrib: 10000 });
+    // tax without pension 33,432 − tax with 27,432
+    expect(r2(res.pension.autoTaxSaving)).toBe(6000.00);
+    expect(r2(res.pension.effectiveCost)).toBe(4000.00);
+  });
+
+  test('£55,000 with £6,000 pension → saving £2,146', () => {
+    const res = calculate({ ...base, grossSalary: 55000, payeContrib: 6000 });
+    // 4,730 spans the higher band @40% (1,892) + 1,270 falls to basic @20% (254)
+    expect(r2(res.pension.autoTaxSaving)).toBe(2146.00);
+  });
+
+  test('calculateFullPension PAYE saving uses delta method', () => {
+    const res = calculateFullPension(110000, 10000, 0, 0, false, '2026/27');
+    expect(r2(res.payeAutoSaving)).toBe(6000.00);
   });
 });
