@@ -28,9 +28,6 @@ npx expo start
 npm test
 ```
 
-## AdMob
-
-Replace test IDs in `src/components/AdBanner.tsx` and `app.json` with your real AdMob app/unit IDs before publishing.
 
 ## Tax rates source
 
