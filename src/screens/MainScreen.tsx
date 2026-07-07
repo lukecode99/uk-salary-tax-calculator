@@ -189,7 +189,7 @@ export function MainScreen({
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.title} adjustsFontSizeToFit numberOfLines={1}>{`UK Salary & Tax Calculator ${settings.taxYear}`}</Text>
+          <Text style={styles.title}>{`UK Salary & Tax Calculator ${settings.taxYear}`}</Text>
 
           {/* Salary inputs */}
           <View style={styles.card}>
