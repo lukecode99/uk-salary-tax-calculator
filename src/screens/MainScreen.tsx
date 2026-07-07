@@ -3,11 +3,16 @@ import {
   View, Text, TextInput, ScrollView, StyleSheet,
   TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 import { calculate, toPeriodResult, calculateFullPension, TaxResult, Period } from '../engine/taxEngine';
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
 import { AppSettings, PensionMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
+
+const BANNER_AD_UNIT_ID = __DEV__
+  ? TestIds.BANNER
+  : 'ca-app-pub-9879821077971587/1830555599';
 
 interface Props {
   newSalary: string;
@@ -321,6 +326,10 @@ export function MainScreen({
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <BannerAd
+        unitId={BANNER_AD_UNIT_ID}
+        size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+      />
     </SafeAreaView>
   );
 }

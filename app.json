@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lukeholder.uksalarytax",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -29,6 +29,14 @@
       },
       "package": "com.lukeholder.uksalarytax"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-9879821077971587~6410175845"
+        }
+      ]
+    ]
   }
 }
