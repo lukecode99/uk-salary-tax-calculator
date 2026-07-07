@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import mobileAds from 'react-native-google-mobile-ads';
 import { MainScreen } from './src/screens/MainScreen';
 import { PensionScreen } from './src/screens/PensionScreen';
 import { SalaryScrificeScreen } from './src/screens/SalaryScrificeScreen';
@@ -32,6 +33,10 @@ export default function App() {
   const [newSalary, setNewSalary] = useState('');
   const [oldSalary, setOldSalary] = useState('');
   const [inputPeriod, setInputPeriod] = useState<Period>('annual');
+
+  useEffect(() => {
+    mobileAds().initialize();
+  }, []);
 
   const annualSalary = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
