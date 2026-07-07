@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Switch, TouchableOpacity,
   ScrollView, StyleSheet, SafeAreaView,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { AppSettings, CarSchemeSettings, SacrificeItem, SacrificeMode, SalaryScrificeSettings } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
@@ -27,7 +28,7 @@ function ModeToggle({ mode, onChange }: { mode: SacrificeMode; onChange: (m: Sac
         <TouchableOpacity
           key={m}
           style={[tog.btn, mode === m && tog.btnActive]}
-          onPress={() => onChange(m)}
+          onPress={() => { Haptics.selectionAsync(); onChange(m); }}
           activeOpacity={0.8}
         >
           <Text style={[tog.label, mode === m && tog.labelActive]}>

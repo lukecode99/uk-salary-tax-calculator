@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Switch, TouchableOpacity,
   ScrollView, StyleSheet, SafeAreaView,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { calculateFullPension, FullPensionResult, Period } from '../engine/taxEngine';
 import { AppSettings, PensionSettings, PensionMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
@@ -193,7 +194,7 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
               </View>
 
               {hasSalary && privateGross > 0 && (
-                <TouchableOpacity onPress={() => setShowPrivateDetail(v => !v)} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setShowPrivateDetail(v => !v); }} activeOpacity={0.7}>
                   <Text style={styles.expandLink}>
                     {showPrivateDetail ? '▲ Hide detail' : '▼ Show detail'}
                   </Text>

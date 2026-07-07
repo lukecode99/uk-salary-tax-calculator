@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Period } from '../engine/taxEngine';
 import { colors, spacing, radius, font } from '../theme';
 
@@ -23,7 +24,7 @@ export function PeriodSelector({ value, onChange }: Props) {
         <TouchableOpacity
           key={p.value}
           style={[styles.pill, value === p.value && styles.pillActive]}
-          onPress={() => onChange(p.value)}
+          onPress={() => { Haptics.selectionAsync(); onChange(p.value); }}
           activeOpacity={0.7}
         >
           <Text style={[styles.label, value === p.value && styles.labelActive]}>
