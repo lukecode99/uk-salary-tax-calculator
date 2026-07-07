@@ -4,7 +4,6 @@ import {
   ScrollView, StyleSheet, SafeAreaView,
 } from 'react-native';
 import { AppSettings, CarSchemeSettings, SacrificeItem, SacrificeMode, SalaryScrificeSettings } from '../types';
-import { AdBanner } from '../components/AdBanner';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -271,7 +270,6 @@ export function SalaryScrificeScreen({ annualSalary, settings, onSettingsChange 
           )}
         </View>
       </ScrollView>
-      <AdBanner />
     </SafeAreaView>
   );
 }

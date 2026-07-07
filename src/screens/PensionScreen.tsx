@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { calculateFullPension, FullPensionResult, Period } from '../engine/taxEngine';
 import { AppSettings, PensionSettings, PensionMode } from '../types';
-import { AdBanner } from '../components/AdBanner';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -260,7 +259,6 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
           </View>
         )}
       </ScrollView>
-      <AdBanner />
     </SafeAreaView>
   );
 }

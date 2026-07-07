@@ -7,7 +7,6 @@ import { AppSettings } from '../types';
 import { StudentLoanPlan, AgeGroup } from '../engine/taxEngine';
 import { TAX_YEARS, TaxYear } from '../engine/taxRates';
 import { colors, spacing, radius, font } from '../theme';
-import { AdBanner } from '../components/AdBanner';
 
 interface Props {
   settings: AppSettings;
@@ -179,7 +178,6 @@ export function SettingsScreen({ settings, onChange }: Props) {
           Pension settings are on the Pension tab. NI stops at State Pension Age (currently 66).
         </Text>
       </ScrollView>
-      <AdBanner />
     </SafeAreaView>
   );
 }

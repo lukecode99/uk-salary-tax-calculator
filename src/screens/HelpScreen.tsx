@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView, StyleSheet, SafeAreaView } from 'react-native';
 import { RATES, TaxYear } from '../engine/taxRates';
 import { colors, spacing, radius, font } from '../theme';
-import { AdBanner } from '../components/AdBanner';
 
 function Section({ title, children }: { title: string; children: string }) {
   return (
@@ -52,7 +51,6 @@ export function HelpScreen({ taxYear }: { taxYear: TaxYear }) {
           </Section>
         </View>
       </ScrollView>
-      <AdBanner />
     </SafeAreaView>
   );
 }

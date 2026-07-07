@@ -6,7 +6,6 @@ import {
 import { calculate, toPeriodResult, calculateFullPension, TaxResult, Period } from '../engine/taxEngine';
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
-import { AdBanner } from '../components/AdBanner';
 import { AppSettings, PensionMode } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
@@ -322,7 +321,6 @@ export function MainScreen({
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-      <AdBanner />
     </SafeAreaView>
   );
 }
