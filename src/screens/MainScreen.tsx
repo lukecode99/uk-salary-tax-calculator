@@ -45,6 +45,7 @@ export function MainScreen({
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
   const [showPension, setShowPension] = React.useState(false);
+  const [showEmployer, setShowEmployer] = React.useState(false);
 
   const newAnnual = useMemo(() => {
     const v = parseFloat(newSalary.replace(/,/g, ''));
@@ -310,18 +311,43 @@ export function MainScreen({
             </View>
           )}
 
-          {/* Cost to employer */}
+          {/* Cost to employer — collapsed by default; with an old salary
+              entered it shows the CHANGE in employer cost, not absolutes. */}
           {current && (
             <View style={styles.card}>
-              <Text style={styles.sectionTitle}>Cost to Employer</Text>
-              <View style={styles.divider} />
-              <ResultRow label="Gross Salary" value={current.grossSalary} />
-              <ResultRow label="Employer NI (15%)" value={current.employerNI} />
-              {current.employerPension > 0 && (
-                <ResultRow label="Employer Pension" value={current.employerPension} />
+              <Text style={styles.sectionTitle}>
+                {hasOld ? 'Change to Employer' : 'Cost to Employer'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowEmployer(v => !v)} activeOpacity={0.7}>
+                <Text style={styles.expandLink}>
+                  {showEmployer ? '▲ Hide detail' : '▼ Show detail'}
+                </Text>
+              </TouchableOpacity>
+              {showEmployer && (
+                <>
+                  <View style={styles.divider} />
+                  <ResultRow
+                    label={hasOld ? 'Gross Change' : 'Gross Salary'}
+                    value={hasOld ? diff('grossSalary')! : current.grossSalary}
+                  />
+                  <ResultRow
+                    label={hasOld ? 'Employer NI Change' : 'Employer NI (15%)'}
+                    value={hasOld ? diff('employerNI')! : current.employerNI}
+                  />
+                  {(hasOld ? diff('employerPension')! !== 0 : current.employerPension > 0) && (
+                    <ResultRow
+                      label={hasOld ? 'Employer Pension Change' : 'Employer Pension'}
+                      value={hasOld ? diff('employerPension')! : current.employerPension}
+                    />
+                  )}
+                  <View style={styles.divider} />
+                  <ResultRow
+                    label={hasOld ? 'Total Change' : 'Total Cost'}
+                    value={hasOld ? diff('employerCost')! : current.employerCost}
+                    bold
+                  />
+                </>
               )}
-              <View style={styles.divider} />
-              <ResultRow label="Total Cost" value={current.employerCost} bold />
             </View>
           )}
         </ScrollView>
