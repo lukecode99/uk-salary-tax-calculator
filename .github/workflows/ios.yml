@@ -137,6 +137,11 @@ jobs:
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
+          # The keychain relocks after 5 minutes by default. Archiving takes
+          # longer than that, so codesign ends up waiting forever for a password
+          # nobody can type and the run dies at "Build iOS archive" with no
+          # error. -lut 21600 holds it open for the whole build.
+          security set-keychain-settings -lut 21600 build.keychain
           security import dist.p12 \
             -k build.keychain \
             -P "${{ secrets.IOS_P12_PASSWORD }}" \

@@ -44,6 +44,7 @@ export function MainScreen({
   inputPeriod, setInputPeriod, settings,
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
+  const [adStatus, setAdStatus] = React.useState('requested');
   const [showPension, setShowPension] = React.useState(false);
   const [showEmployer, setShowEmployer] = React.useState(false);
 
@@ -352,15 +353,43 @@ export function MainScreen({
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      {/*
+        A banner that fails to load renders nothing at all, which looks exactly
+        like broken wiring. Surfacing the error is the only way to tell the two
+        apart — expect no fill until the app is live on the App Store and its
+        AdMob approval status leaves "Requires review".
+      */}
       <BannerAd
         unitId={BANNER_AD_UNIT_ID}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        onAdLoaded={() => {
+          console.log('[ads] banner loaded');
+          setAdStatus('loaded');
+        }}
+        onAdFailedToLoad={(error) => {
+          // The SDK hands back a NativeError carrying an AdMob error code, but
+          // the prop is typed as a plain Error and NativeError only lives on the
+          // package's internal path — so read the code off defensively rather
+          // than importing something we'd be on the hook for when it moves.
+          const code = (error as { code?: string }).code ?? 'unknown';
+          console.warn('[ads] banner failed', code, error.message);
+          setAdStatus(`failed: ${code} ${error.message}`);
+        }}
       />
+      {__DEV__ && adStatus !== 'loaded' && (
+        <Text style={styles.adStatus}>{`ad ${adStatus}`}</Text>
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  adStatus: {
+    color: colors.textMuted,
+    fontSize: font.sizes.xs,
+    textAlign: 'center',
+    paddingBottom: spacing.xs,
+  },
   safe: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
   scroll: { flex: 1 },
