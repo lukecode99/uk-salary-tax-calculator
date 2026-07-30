@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import mobileAds from 'react-native-google-mobile-ads';
+import { mobileAds } from './src/ads';
 import { MainScreen } from './src/screens/MainScreen';
 import { PensionScreen } from './src/screens/PensionScreen';
 import { SalaryScrificeScreen } from './src/screens/SalaryScrificeScreen';

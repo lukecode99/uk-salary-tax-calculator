@@ -81,6 +81,10 @@
       },
       "package": "com.lukeholder.uksalarytax"
     },
+    "experiments": {
+      "_comment": "GitHub Pages serves this repo from a subpath, so the web bundle has to be referenced from there — without baseUrl the export emits absolute /_expo/... URLs that 404 on Pages.",
+      "baseUrl": "/uk-salary-tax-calculator"
+    },
     "plugins": [
       [
         "react-native-google-mobile-ads",

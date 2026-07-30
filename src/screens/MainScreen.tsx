@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, ScrollView, StyleSheet,
   TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { BannerAd, BannerAdSize, TestIds } from '../ads';
 import { calculate, toPeriodResult, calculateFullPension, TaxResult, Period } from '../engine/taxEngine';
 import { PeriodSelector } from '../components/PeriodSelector';
 import { ResultRow, formatCurrency } from '../components/ResultRow';
@@ -362,6 +362,12 @@ export function MainScreen({
       <BannerAd
         unitId={BANNER_AD_UNIT_ID}
         size={BannerAdSize.ANCHORED_ADAPTIVE_BANNER}
+        // Non-personalised is the only lawful default here: UK GDPR needs
+        // consent before ads are targeted on a user profile, and the app ships
+        // no consent form. It also means no App Tracking Transparency prompt.
+        // Serving personalised ads later means adding Google's UMP flow first,
+        // and updating public/privacy.html to match.
+        requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdLoaded={() => {
           console.log('[ads] banner loaded');
           setAdStatus('loaded');
