@@ -3,6 +3,7 @@
     "name": "UK Salary & Tax Calculator 2026",
     "slug": "uk-salary-tax-calculator",
     "version": "1.0.0",
+    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
