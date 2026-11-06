@@ -1,4 +1,4 @@
-import { calculate, toPeriodResult, TaxInputs, calculateFullPension } from '../taxEngine';
+import { calculate, toPeriodResult, TaxInputs, calculateFullPension, calculateAni, CHILDCARE_ANI_THRESHOLD } from '../taxEngine';
 import { defaultTaxYear } from '../taxRates';
 
 const base: TaxInputs = {
@@ -444,5 +444,51 @@ describe('Delta-method pension saving', () => {
   test('calculateFullPension PAYE saving uses delta method', () => {
     const res = calculateFullPension(110000, 10000, 0, 0, false, '2026/27');
     expect(r2(res.payeAutoSaving)).toBe(6000.00);
+  });
+});
+
+describe('calculateAni (childcare £100k cliff-edge)', () => {
+  test('threshold is £100,000', () => {
+    expect(CHILDCARE_ANI_THRESHOLD).toBe(100000);
+  });
+
+  test('ANI = gross minus pension deduction', () => {
+    const r = calculateAni(120000, 15000);
+    expect(r.adjustedNetIncome).toBe(105000);
+    expect(r.pensionDeduction).toBe(15000);
+  });
+
+  test('under threshold → headroom, not over', () => {
+    const r = calculateAni(90000, 0);
+    expect(r.isOver).toBe(false);
+    expect(r.headroom).toBe(10000);
+    expect(r.overBy).toBe(0);
+  });
+
+  test('exactly at £100k counts as over (hard cut-off is >=)', () => {
+    const r = calculateAni(100000, 0);
+    expect(r.isOver).toBe(true);
+    expect(r.overBy).toBe(0);
+    expect(r.headroom).toBe(0);
+  });
+
+  test('over threshold → gross top-up equals the excess, net is ×0.8', () => {
+    const r = calculateAni(134000, 0);
+    expect(r.isOver).toBe(true);
+    expect(r.overBy).toBe(34000);
+    expect(r.grossPensionToThreshold).toBe(34000);
+    expect(r.netPensionToThreshold).toBe(27200);
+  });
+
+  test('pension already brings ANI under the cliff', () => {
+    const r = calculateAni(134000, 40000);
+    expect(r.adjustedNetIncome).toBe(94000);
+    expect(r.isOver).toBe(false);
+    expect(r.headroom).toBe(6000);
+  });
+
+  test('ANI never negative', () => {
+    const r = calculateAni(20000, 50000);
+    expect(r.adjustedNetIncome).toBe(0);
   });
 });

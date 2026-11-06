@@ -288,6 +288,45 @@ export function calculate(inputs: TaxInputs): TaxResult {
   };
 }
 
+// ---- Adjusted Net Income (for the childcare £100k cliff-edge) ----
+// ANI = total taxable income minus grossed-up pension contributions and Gift Aid.
+// On the Pension screen the reduction we model is workplace (net-pay) employee
+// contributions plus the GROSS of any relief-at-source private contribution; both
+// reduce ANI. Employer contributions do not. If ANI is £100,000 or more, Tax-Free
+// Childcare and the 15/30 funded hours are lost entirely — no taper, a hard cut-off,
+// tested per parent.
+export const CHILDCARE_ANI_THRESHOLD = 100000;
+
+export interface AniResult {
+  grossSalary: number;
+  pensionDeduction: number;    // payeEmployee + privateGross
+  adjustedNetIncome: number;
+  threshold: number;
+  isOver: boolean;             // true if ANI >= threshold (childcare support lost)
+  headroom: number;            // if under: how much more income before the cliff (>= 0)
+  overBy: number;              // if over: how far over the threshold (>= 0)
+  grossPensionToThreshold: number; // extra gross pension needed to land on the threshold
+  netPensionToThreshold: number;   // what you physically pay via relief at source (× 0.8)
+}
+
+export function calculateAni(grossSalary: number, pensionDeduction: number): AniResult {
+  const ani = Math.max(0, grossSalary - pensionDeduction);
+  const threshold = CHILDCARE_ANI_THRESHOLD;
+  const isOver = ani >= threshold;
+  const overBy = isOver ? ani - threshold : 0;
+  return {
+    grossSalary,
+    pensionDeduction,
+    adjustedNetIncome: ani,
+    threshold,
+    isOver,
+    headroom: isOver ? 0 : threshold - ani,
+    overBy,
+    grossPensionToThreshold: overBy,
+    netPensionToThreshold: overBy * 0.8,
+  };
+}
+
 const WEEKS_PER_YEAR = 52;
 
 export function toPeriodResult(annual: TaxResult, hoursPerWeek: number, daysPerWeek: number): PeriodResult {

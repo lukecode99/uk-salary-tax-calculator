@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, SafeAreaView,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { calculateFullPension, FullPensionResult, Period } from '../engine/taxEngine';
+import { calculateFullPension, FullPensionResult, Period, calculateAni } from '../engine/taxEngine';
 import { AppSettings, PensionSettings, PensionMode, PensionBasis } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
@@ -154,6 +154,14 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
   const hasSalary = annualSalary > 0;
   const hasSaClaim = result && (result.privateSaClaim > 0 || result.payeSaClaim > 0);
 
+  // Adjusted net income for the £100k childcare cliff-edge. The pension that
+  // reduces ANI = workplace (net-pay) employee contributions + the gross of the
+  // relief-at-source private contribution.
+  const ani = useMemo(
+    () => calculateAni(annualSalary, payeEmployee + privateGross),
+    [annualSalary, payeEmployee, privateGross],
+  );
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
@@ -272,6 +280,46 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
             </>
           )}
         </View>
+
+        {/* Adjusted Net Income — childcare £100k cliff-edge */}
+        {hasSalary && (
+          <View style={styles.card}>
+            <SectionHeader title="Adjusted Net Income" />
+            <Text style={styles.aniSubtitle}>
+              The £100,000 cliff for Tax-Free Childcare &amp; 15/30 funded hours — tested per parent on adjusted net income, not gross salary.
+            </Text>
+
+            <Text style={[styles.aniValue, ani.isOver ? styles.aniOver : styles.aniUnder]}>
+              {formatGBP(ani.adjustedNetIncome)}
+            </Text>
+            <Text style={styles.aniWorking}>
+              {formatGBP(ani.grossSalary)} salary − {formatGBP(ani.pensionDeduction)} pension
+            </Text>
+
+            {!ani.isOver ? (
+              <View style={styles.aniCalloutGood}>
+                <Text style={styles.aniCalloutGoodText}>
+                  ✓ Under £100k — childcare support kept. {formatGBP(ani.headroom)} of headroom before the cliff.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.aniCalloutBad}>
+                <Text style={styles.aniCalloutBadText}>
+                  ✗ {formatGBP(ani.overBy)} over £100k — all Tax-Free Childcare and funded hours lost.
+                </Text>
+                <Text style={styles.aniFixLabel}>
+                  To get back under: add {formatGBP(ani.grossPensionToThreshold)} gross pension
+                  {' '}(you pay {formatGBP(ani.netPensionToThreshold)} into a relief-at-source SIPP),
+                  {' '}or salary-sacrifice {formatGBP(ani.overBy)}.
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.aniNote}>
+              Salary-only estimate from the two pension figures above. Real ANI also adds taxable benefits, savings interest, dividends and rental profit, and subtracts Gift Aid (grossed up ÷0.8).
+            </Text>
+          </View>
+        )}
 
         {/* Summary */}
         {hasSalary && result && (payeEmployee + payeEmployer + privateGross > 0) && (
@@ -417,4 +465,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   saCalloutText: { fontSize: font.sizes.sm, color: colors.primary, fontWeight: '600' },
+  aniSubtitle: { fontSize: font.sizes.xs, color: colors.textSecondary, lineHeight: 16 },
+  aniValue: { fontSize: 40, fontWeight: '800', letterSpacing: -1, marginTop: spacing.xs },
+  aniUnder: { color: colors.primary },
+  aniOver: { color: '#FF5252' },
+  aniWorking: { fontSize: font.sizes.sm, color: colors.textSecondary, marginBottom: spacing.xs },
+  aniCalloutGood: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  aniCalloutGoodText: { fontSize: font.sizes.sm, color: colors.primary, fontWeight: '600', lineHeight: 18 },
+  aniCalloutBad: {
+    backgroundColor: 'rgba(255, 82, 82, 0.12)',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  aniCalloutBadText: { fontSize: font.sizes.sm, color: '#FF5252', fontWeight: '700', lineHeight: 18 },
+  aniFixLabel: { fontSize: font.sizes.sm, color: colors.text, lineHeight: 18 },
+  aniNote: { fontSize: font.sizes.xs, color: colors.textSecondary, lineHeight: 16, marginTop: spacing.xs },
 });
