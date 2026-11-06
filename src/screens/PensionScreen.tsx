@@ -44,7 +44,7 @@ function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: Pensi
 }
 
 const tog = StyleSheet.create({
-  container: { flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.sm, padding: 2 },
+  container: { flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.sm, padding: 2, alignSelf: 'flex-start' },
   btn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm - 2 },
   btnActive: { backgroundColor: colors.primary },
   label: { fontSize: font.sizes.sm, color: colors.textSecondary, fontWeight: '600' },
@@ -182,8 +182,8 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
             <>
               <View style={styles.inputGroup}>
                 <Text style={styles.inputGroupLabel}>Your contribution</Text>
+                <ModeToggle mode={p.payeEmployeeMode} onChange={(m) => updatePension({ payeEmployeeMode: m })} />
                 <View style={styles.inputRow}>
-                  <ModeToggle mode={p.payeEmployeeMode} onChange={(m) => updatePension({ payeEmployeeMode: m })} />
                   <ValueInput mode={p.payeEmployeeMode} value={p.payeEmployeeValue} onChange={(v) => updatePension({ payeEmployeeValue: v })} />
                   {hasSalary && (
                     <Text style={styles.resolvedAmount}>{formatGBP(payeEmployee)}/yr</Text>
@@ -193,8 +193,8 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
               <View style={styles.inputGroup}>
                 <Text style={styles.inputGroupLabel}>Employer contribution</Text>
+                <ModeToggle mode={p.payeEmployerMode} onChange={(m) => updatePension({ payeEmployerMode: m })} />
                 <View style={styles.inputRow}>
-                  <ModeToggle mode={p.payeEmployerMode} onChange={(m) => updatePension({ payeEmployerMode: m })} />
                   <ValueInput mode={p.payeEmployerMode} value={p.payeEmployerValue} onChange={(v) => updatePension({ payeEmployerValue: v })} />
                   {hasSalary && (
                     <Text style={[styles.resolvedAmount, styles.freeTag]}>{formatGBP(payeEmployer)}/yr</Text>
@@ -232,8 +232,8 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
                 <Text style={styles.inputGroupLabel}>
                   {p.privateBasis === 'net' ? 'Amount you pay in' : 'Gross contribution'}
                 </Text>
+                <ModeToggle mode={p.privateMode} onChange={(m) => updatePension({ privateMode: m })} />
                 <View style={styles.inputRow}>
-                  <ModeToggle mode={p.privateMode} onChange={(m) => updatePension({ privateMode: m })} />
                   <ValueInput mode={p.privateMode} value={p.privateValue} onChange={(v) => updatePension({ privateValue: v })} />
                   {hasSalary && (
                     <Text style={styles.resolvedAmount}>{formatGBP(privateEntered)}/yr</Text>
