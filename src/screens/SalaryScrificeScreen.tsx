@@ -50,15 +50,29 @@ const tog = StyleSheet.create({
 
 function NumInput({ value, onChange, placeholder }: { value: number; onChange: (v: number) => void; placeholder?: string }) {
   const [text, setText] = React.useState(value > 0 ? String(value) : '');
+  const [focused, setFocused] = React.useState(false);
   return (
     <TextInput
-      style={styles.valInput}
+      style={[styles.valInput, focused && styles.valInputFocused]}
       keyboardType="decimal-pad"
       value={text}
       placeholder={placeholder ?? '0'}
       placeholderTextColor={colors.textMuted}
       onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0) onChange(n); }}
-      onBlur={() => setText(value > 0 ? String(value) : '')}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); setText(value > 0 ? String(value) : ''); }}
+    />
+  );
+}
+
+function FocusInput({ style, onFocus, onBlur, ...rest }: React.ComponentProps<typeof TextInput>) {
+  const [focused, setFocused] = React.useState(false);
+  return (
+    <TextInput
+      {...rest}
+      style={[style, focused && styles.valInputFocused]}
+      onFocus={(e) => { setFocused(true); onFocus?.(e); }}
+      onBlur={(e) => { setFocused(false); onBlur?.(e); }}
     />
   );
 }
@@ -155,7 +169,7 @@ function CarSection({ car, annualSalary, onUpdate }: CarSectionProps) {
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>CO2 emissions (g/km) — auto-sets BiK rate</Text>
             <View style={styles.inputRow}>
-              <TextInput
+              <FocusInput
                 style={[styles.valInput, { flex: 1 }]}
                 keyboardType="decimal-pad"
                 value={co2Text}
@@ -165,7 +179,7 @@ function CarSection({ car, annualSalary, onUpdate }: CarSectionProps) {
               />
               <Text style={styles.resolvedAmount}>BiK rate</Text>
               <View style={styles.bikRateBox}>
-                <TextInput
+                <FocusInput
                   style={styles.bikRateInput}
                   keyboardType="decimal-pad"
                   value={car.bikRate > 0 ? String(car.bikRate) : ''}
@@ -310,6 +324,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg,
     color: colors.inputText,
     borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs + 2,
     fontSize: font.sizes.md,
@@ -317,12 +333,18 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     minWidth: 80,
   },
+  valInputFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
+  },
   resolvedAmount: { fontSize: font.sizes.sm, color: colors.textSecondary, minWidth: 60, textAlign: 'right' },
   bikRateBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   bikRateInput: {
     backgroundColor: colors.inputBg,
     color: colors.inputText,
     borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs + 2,
     fontSize: font.sizes.md,

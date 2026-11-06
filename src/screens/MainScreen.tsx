@@ -44,6 +44,7 @@ export function MainScreen({
   inputPeriod, setInputPeriod, settings,
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
+  const [focusedField, setFocusedField] = React.useState<string | null>(null);
   const [adStatus, setAdStatus] = React.useState('requested');
   const [showPension, setShowPension] = React.useState(false);
   const [showEmployer, setShowEmployer] = React.useState(false);
@@ -197,7 +198,7 @@ export function MainScreen({
           <View style={styles.card}>
             <View style={styles.inputRow}>
               <Text style={styles.inputLabel} numberOfLines={1}>New</Text>
-              <View style={styles.inputWrapper}>
+              <View style={[styles.inputWrapper, focusedField === 'new' && styles.inputWrapperFocused]}>
                 <Text style={styles.currencyPrefix}>£</Text>
                 <TextInput
                   style={styles.input}
@@ -205,6 +206,8 @@ export function MainScreen({
                   placeholder="0"
                   placeholderTextColor={colors.textMuted}
                   value={newSalary}
+                  onFocus={() => setFocusedField('new')}
+                  onBlur={() => setFocusedField(null)}
                   onChangeText={(t) => {
                     const raw = t.replace(/[^0-9.]/g, '');
                     const [int, dec] = raw.split('.');
@@ -216,7 +219,7 @@ export function MainScreen({
             </View>
             <View style={styles.inputRow}>
               <Text style={styles.inputLabel} numberOfLines={1}>Old</Text>
-              <View style={[styles.inputWrapper, styles.inputWrapperAlt]}>
+              <View style={[styles.inputWrapper, styles.inputWrapperAlt, focusedField === 'old' && styles.inputWrapperFocused]}>
                 <Text style={styles.currencyPrefix}>£</Text>
                 <TextInput
                   style={styles.input}
@@ -224,6 +227,8 @@ export function MainScreen({
                   placeholder="Optional"
                   placeholderTextColor={colors.textMuted}
                   value={oldSalary}
+                  onFocus={() => setFocusedField('old')}
+                  onBlur={() => setFocusedField(null)}
                   onChangeText={(t) => {
                     const raw = t.replace(/[^0-9.]/g, '');
                     const [int, dec] = raw.split('.');
@@ -431,12 +436,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.inputBg,
     borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs + 2,
     minWidth: 0,
   },
   inputWrapperAlt: {
     backgroundColor: '#1E1E1E',
+  },
+  inputWrapperFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   currencyPrefix: {
     color: colors.textSecondary,

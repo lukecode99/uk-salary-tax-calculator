@@ -51,13 +51,15 @@ function ValueInput({
   mode: PensionMode; value: number; onChange: (v: number) => void;
 }) {
   const [text, setText] = React.useState(String(value));
+  const [focused, setFocused] = React.useState(false);
   return (
     <TextInput
-      style={styles.valInput}
+      style={[styles.valInput, focused && styles.valInputFocused]}
       keyboardType="decimal-pad"
       value={text}
       onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n) && n >= 0) onChange(n); }}
-      onBlur={() => setText(String(value))}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); setText(String(value)); }}
     />
   );
 }
@@ -310,11 +312,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg,
     color: colors.inputText,
     borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs + 2,
     fontSize: font.sizes.md,
     fontWeight: '600',
     textAlign: 'right',
+  },
+  valInputFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   resolvedAmount: {
     fontSize: font.sizes.sm,

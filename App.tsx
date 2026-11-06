@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import { mobileAds } from './src/ads';
 import { MainScreen } from './src/screens/MainScreen';
 import { PensionScreen } from './src/screens/PensionScreen';
@@ -58,7 +59,15 @@ export default function App() {
           headerShown: false,
         }}
       >
-        <Tab.Screen name="Calculator" options={{ tabBarLabel: 'Calculator' }}>
+        <Tab.Screen
+          name="Calculator"
+          options={{
+            tabBarLabel: 'Calculator',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons name={focused ? 'calculator' : 'calculator-outline'} size={size} color={color} />
+            ),
+          }}
+        >
           {() => (
             <MainScreen
               newSalary={newSalary}
@@ -72,7 +81,15 @@ export default function App() {
           )}
         </Tab.Screen>
 
-        <Tab.Screen name="Pension" options={{ tabBarLabel: 'Pension' }}>
+        <Tab.Screen
+          name="Pension"
+          options={{
+            tabBarLabel: 'Pension',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={size} color={color} />
+            ),
+          }}
+        >
           {() => (
             <PensionScreen
               annualSalary={annualSalary}
@@ -82,7 +99,15 @@ export default function App() {
           )}
         </Tab.Screen>
 
-        <Tab.Screen name="Sacrifice" options={{ tabBarLabel: 'Sacrifice' }}>
+        <Tab.Screen
+          name="Sacrifice"
+          options={{
+            tabBarLabel: 'Sacrifice',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons name={focused ? 'swap-vertical' : 'swap-vertical-outline'} size={size} color={color} />
+            ),
+          }}
+        >
           {() => (
             <SalaryScrificeScreen
               annualSalary={annualSalary}
@@ -92,11 +117,27 @@ export default function App() {
           )}
         </Tab.Screen>
 
-        <Tab.Screen name="Settings" options={{ tabBarLabel: 'Settings' }}>
+        <Tab.Screen
+          name="Settings"
+          options={{
+            tabBarLabel: 'Settings',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons name={focused ? 'settings' : 'settings-outline'} size={size} color={color} />
+            ),
+          }}
+        >
           {() => <SettingsScreen settings={settings} onChange={setSettings} />}
         </Tab.Screen>
 
-        <Tab.Screen name="Help" options={{ tabBarLabel: 'Help' }}>
+        <Tab.Screen
+          name="Help"
+          options={{
+            tabBarLabel: 'Help',
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons name={focused ? 'help-circle' : 'help-circle-outline'} size={size} color={color} />
+            ),
+          }}
+        >
           {() => <HelpScreen taxYear={settings.taxYear} />}
         </Tab.Screen>
       </Tab.Navigator>

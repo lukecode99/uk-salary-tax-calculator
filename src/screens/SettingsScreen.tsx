@@ -77,14 +77,16 @@ function NumericInput({
   value: number; onChange: (v: number) => void; suffix?: string;
 }) {
   const [text, setText] = React.useState(String(value));
+  const [focused, setFocused] = React.useState(false);
   return (
     <View style={styles.numRow}>
       <TextInput
-        style={styles.numInput}
+        style={[styles.numInput, focused && styles.numInputFocused]}
         keyboardType="decimal-pad"
         value={text}
         onChangeText={(t) => { setText(t); const n = parseFloat(t); if (!isNaN(n)) onChange(n); }}
-        onBlur={() => setText(String(value))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); setText(String(value)); }}
       />
       {suffix && <Text style={styles.suffix}>{suffix}</Text>}
     </View>
@@ -219,12 +221,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBg,
     color: colors.inputText,
     borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     fontSize: font.sizes.md,
     fontWeight: '600',
     textAlign: 'right',
     minWidth: 72,
+  },
+  numInputFocused: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
   },
   suffix: { color: colors.textSecondary, fontSize: font.sizes.md, marginLeft: spacing.xs },
   note: {
