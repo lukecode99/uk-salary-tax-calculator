@@ -2,6 +2,9 @@ import { StudentLoanPlan, AgeGroup, Period } from './engine/taxEngine';
 import { TaxYear, defaultTaxYear } from './engine/taxRates';
 
 export type PensionMode = 'percent' | 'fixed' | 'monthly';
+// For private pensions, whether the entered figure is what the user pays from
+// their take-home ('net') or the grossed-up total that lands in the pot ('gross').
+export type PensionBasis = 'gross' | 'net';
 export type SacrificeMode = 'fixed' | 'monthly'; // £/yr or £/mo only (no % for sacrifice)
 
 export interface SacrificeItem {
@@ -29,6 +32,7 @@ export interface PensionSettings {
   privateEnabled: boolean;
   privateMode: PensionMode;
   privateValue: number;
+  privateBasis: PensionBasis;
 }
 
 export interface AppSettings {
@@ -60,6 +64,7 @@ export const DEFAULT_PENSION: PensionSettings = {
   privateEnabled: false,
   privateMode: 'percent',
   privateValue: 0,
+  privateBasis: 'net',
 };
 
 export const DEFAULT_SACRIFICE: SalaryScrificeSettings = {

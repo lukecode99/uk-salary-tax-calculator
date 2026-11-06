@@ -70,7 +70,9 @@ export function MainScreen({
   function getPrivateContrib(annualGross: number): number {
     const p = settings.pension;
     if (!p.privateEnabled || p.privateValue === 0) return 0;
-    return p.privateMode === 'percent' ? annualGross * (p.privateValue / 100) : p.privateValue;
+    const entered = p.privateMode === 'percent' ? annualGross * (p.privateValue / 100) : p.privateValue;
+    // Engine wants the gross contribution; gross up if the user entered what they pay ('net').
+    return p.privateBasis === 'net' ? entered / 0.8 : entered;
   }
 
   function getEmployerPension(annualGross: number): number {
@@ -136,7 +138,8 @@ export function MainScreen({
     if (newAnnual === null) return 0;
     const p = settings.pension;
     if (!p.privateEnabled || p.privateValue === 0) return 0;
-    const privateGross = p.privateMode === 'percent' ? newAnnual * (p.privateValue / 100) : p.privateValue;
+    const entered = p.privateMode === 'percent' ? newAnnual * (p.privateValue / 100) : p.privateValue;
+    const privateGross = p.privateBasis === 'net' ? entered / 0.8 : entered;
     const payeEmp = getPayeContrib(newAnnual);
     const payeEmpR = p.payeEnabled ? (p.payeEmployerMode === 'percent' ? newAnnual * (p.payeEmployerValue / 100) : p.payeEmployerValue) : 0;
     const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates, settings.taxYear);

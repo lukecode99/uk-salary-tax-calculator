@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { calculateFullPension, FullPensionResult, Period } from '../engine/taxEngine';
-import { AppSettings, PensionSettings, PensionMode } from '../types';
+import { AppSettings, PensionSettings, PensionMode, PensionBasis } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -40,6 +40,35 @@ function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: Pensi
 const tog = StyleSheet.create({
   container: { flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.sm, padding: 2 },
   btn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm - 2 },
+  btnActive: { backgroundColor: colors.primary },
+  label: { fontSize: font.sizes.sm, color: colors.textSecondary, fontWeight: '600' },
+  labelActive: { color: '#000' },
+});
+
+function BasisToggle({ basis, onChange }: { basis: PensionBasis; onChange: (b: PensionBasis) => void }) {
+  const opts: { key: PensionBasis; label: string }[] = [
+    { key: 'net', label: 'What you pay' },
+    { key: 'gross', label: 'Gross (in pot)' },
+  ];
+  return (
+    <View style={basisTog.container}>
+      {opts.map((o) => (
+        <TouchableOpacity
+          key={o.key}
+          style={[basisTog.btn, basis === o.key && basisTog.btnActive]}
+          onPress={() => onChange(o.key)}
+          activeOpacity={0.8}
+        >
+          <Text style={[basisTog.label, basis === o.key && basisTog.labelActive]}>{o.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+const basisTog = StyleSheet.create({
+  container: { flexDirection: 'row', backgroundColor: colors.surface2, borderRadius: radius.sm, padding: 2, alignSelf: 'flex-start' },
+  btn: { paddingHorizontal: spacing.md, paddingVertical: spacing.xs, borderRadius: radius.sm - 2 },
   btnActive: { backgroundColor: colors.primary },
   label: { fontSize: font.sizes.sm, color: colors.textSecondary, fontWeight: '600' },
   labelActive: { color: '#000' },
@@ -98,7 +127,10 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
   const payeEmployee = p.payeEnabled ? resolve(p.payeEmployeeMode, p.payeEmployeeValue) : 0;
   const payeEmployer = p.payeEnabled ? resolve(p.payeEmployerMode, p.payeEmployerValue) : 0;
-  const privateGross = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
+  const privateEntered = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
+  // The engine expects a gross contribution. If the user entered what leaves
+  // their take-home ('net'), gross it up by basic-rate relief (net / 0.8).
+  const privateGross = p.privateBasis === 'net' ? privateEntered / 0.8 : privateEntered;
 
   const result: FullPensionResult | null = useMemo(() => {
     if (annualSalary <= 0) return null;
@@ -185,14 +217,28 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
           {p.privateEnabled && (
             <>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputGroupLabel}>Gross contribution</Text>
+                <Text style={styles.inputGroupLabel}>Contribution basis</Text>
+                <BasisToggle basis={p.privateBasis} onChange={(b) => updatePension({ privateBasis: b })} />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputGroupLabel}>
+                  {p.privateBasis === 'net' ? 'Amount you pay in' : 'Gross contribution'}
+                </Text>
                 <View style={styles.inputRow}>
                   <ModeToggle mode={p.privateMode} onChange={(m) => updatePension({ privateMode: m })} />
                   <ValueInput mode={p.privateMode} value={p.privateValue} onChange={(v) => updatePension({ privateValue: v })} />
                   {hasSalary && (
-                    <Text style={styles.resolvedAmount}>{formatGBP(privateGross)}/yr</Text>
+                    <Text style={styles.resolvedAmount}>{formatGBP(privateEntered)}/yr</Text>
                   )}
                 </View>
+                {hasSalary && privateGross > 0 && (
+                  <Text style={styles.basisNote}>
+                    {p.privateBasis === 'net'
+                      ? `→ ${formatGBP(privateGross)}/yr lands in your pension (after 20% basic-rate relief)`
+                      : `→ you pay ${formatGBP(privateGross * 0.8)}/yr; HMRC adds the other ${formatGBP(privateGross * 0.2)}`}
+                  </Text>
+                )}
               </View>
 
               {hasSalary && privateGross > 0 && (
@@ -332,6 +378,7 @@ const styles = StyleSheet.create({
   },
   freeTag: { color: colors.primary, fontWeight: '600' },
   freeNote: { fontSize: font.sizes.xs, color: colors.primary, marginTop: 2 },
+  basisNote: { fontSize: font.sizes.xs, color: colors.textSecondary, marginTop: 4 },
   sectionDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   expandLink: {
     color: colors.primary,
