@@ -36,7 +36,9 @@ function toAnnual(value: number, period: Period, hours: number, days: number): n
 }
 
 function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): number {
-  return mode === 'percent' ? grossSalary * (value / 100) : value;
+  if (mode === 'percent') return grossSalary * (value / 100);
+  if (mode === 'monthly') return value * 12; // £/mo → annual
+  return value; // fixed = £/yr
 }
 
 export function MainScreen({
@@ -70,7 +72,7 @@ export function MainScreen({
   function getPrivateContrib(annualGross: number): number {
     const p = settings.pension;
     if (!p.privateEnabled || p.privateValue === 0) return 0;
-    const entered = p.privateMode === 'percent' ? annualGross * (p.privateValue / 100) : p.privateValue;
+    const entered = pensionAnnual(annualGross, p.privateMode, p.privateValue);
     // Engine wants the gross contribution; gross up if the user entered what they pay ('net').
     return p.privateBasis === 'net' ? entered / 0.8 : entered;
   }
@@ -138,10 +140,10 @@ export function MainScreen({
     if (newAnnual === null) return 0;
     const p = settings.pension;
     if (!p.privateEnabled || p.privateValue === 0) return 0;
-    const entered = p.privateMode === 'percent' ? newAnnual * (p.privateValue / 100) : p.privateValue;
+    const entered = pensionAnnual(newAnnual, p.privateMode, p.privateValue);
     const privateGross = p.privateBasis === 'net' ? entered / 0.8 : entered;
     const payeEmp = getPayeContrib(newAnnual);
-    const payeEmpR = p.payeEnabled ? (p.payeEmployerMode === 'percent' ? newAnnual * (p.payeEmployerValue / 100) : p.payeEmployerValue) : 0;
+    const payeEmpR = p.payeEnabled ? pensionAnnual(newAnnual, p.payeEmployerMode, p.payeEmployerValue) : 0;
     const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates, settings.taxYear);
     return full.privateSaClaim;
   }, [newAnnual, settings]);

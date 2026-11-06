@@ -18,10 +18,16 @@ function formatGBP(v: number): string {
   return '£' + Math.round(v).toLocaleString('en-GB');
 }
 
+const MODE_LABELS: Record<PensionMode, string> = {
+  percent: '%',
+  fixed: '£/yr',
+  monthly: '£/mo',
+};
+
 function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: PensionMode) => void }) {
   return (
     <View style={tog.container}>
-      {(['percent', 'fixed'] as PensionMode[]).map((m) => (
+      {(['percent', 'fixed', 'monthly'] as PensionMode[]).map((m) => (
         <TouchableOpacity
           key={m}
           style={[tog.btn, mode === m && tog.btnActive]}
@@ -29,7 +35,7 @@ function ModeToggle({ mode, onChange }: { mode: PensionMode; onChange: (m: Pensi
           activeOpacity={0.8}
         >
           <Text style={[tog.label, mode === m && tog.labelActive]}>
-            {m === 'percent' ? '%' : '£'}
+            {MODE_LABELS[m]}
           </Text>
         </TouchableOpacity>
       ))}
@@ -121,8 +127,9 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
   }
 
   function resolve(mode: PensionMode, value: number): number {
-    if (annualSalary === 0) return 0;
-    return mode === 'percent' ? annualSalary * (value / 100) : value;
+    if (mode === 'percent') return annualSalary === 0 ? 0 : annualSalary * (value / 100);
+    if (mode === 'monthly') return value * 12; // £/mo → annual
+    return value; // fixed = £/yr
   }
 
   const payeEmployee = p.payeEnabled ? resolve(p.payeEmployeeMode, p.payeEmployeeValue) : 0;
