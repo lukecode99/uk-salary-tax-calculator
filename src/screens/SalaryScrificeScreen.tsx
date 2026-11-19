@@ -234,7 +234,12 @@ export function SalaryScrificeScreen({ annualSalary, settings, onSettingsChange 
     onSettingsChange({ ...settings, sacrifice: { ...s, bike: { ...s.bike, ...patch } } });
   }
 
+  function updateChildcare(patch: Partial<SacrificeItem>) {
+    onSettingsChange({ ...settings, sacrifice: { ...s, childcare: { ...s.childcare, ...patch } } });
+  }
+
   const bikeAnnual = s.bike.enabled ? resolveAnnual(s.bike.mode, s.bike.value) : 0;
+  const childcareAnnual = s.childcare.enabled ? resolveAnnual(s.childcare.mode, s.childcare.value) : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -278,6 +283,44 @@ export function SalaryScrificeScreen({ annualSalary, settings, onSettingsChange 
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>{formatGBP(bikeAnnual / 12)}/mo before tax & NI</Text>
                     <Text style={styles.infoValue}>{formatGBP(bikeAnnual)}/yr</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* Childcare vouchers */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.sectionTitle}>Childcare Vouchers</Text>
+            <Switch
+              value={s.childcare.enabled}
+              onValueChange={(v) => updateChildcare({ enabled: v })}
+              trackColor={{ true: colors.primary }}
+              thumbColor={s.childcare.enabled ? '#000' : colors.textSecondary}
+            />
+          </View>
+          <Text style={styles.note}>
+            Employer childcare vouchers taken via salary sacrifice save income tax AND NI. The scheme closed to new entrants in Oct 2018 — only those already enrolled can continue. Tax/NI-exempt caps: £55/wk (basic rate), £28/wk (higher), £25/wk (additional).
+          </Text>
+          {s.childcare.enabled && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Amount sacrificed</Text>
+                <View style={styles.inputRow}>
+                  <ModeToggle mode={s.childcare.mode} onChange={(m) => updateChildcare({ mode: m })} />
+                  <NumInput value={s.childcare.value} onChange={(v) => updateChildcare({ value: v })} />
+                  {childcareAnnual > 0 && (
+                    <Text style={styles.resolvedAmount}>{formatGBP(childcareAnnual)}/yr</Text>
+                  )}
+                </View>
+              </View>
+              {childcareAnnual > 0 && (
+                <View style={styles.infoBox}>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>{formatGBP(childcareAnnual / 12)}/mo before tax & NI</Text>
+                    <Text style={styles.infoValue}>{formatGBP(childcareAnnual)}/yr</Text>
                   </View>
                 </View>
               )}

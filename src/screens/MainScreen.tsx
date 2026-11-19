@@ -42,6 +42,19 @@ function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): n
   return value; // fixed = £/yr
 }
 
+// Scale an annual figure to the displayed result period — mirrors the engine's
+// toPeriodResult scaling so component subrows line up with their totals.
+function periodFactor(period: Period, hours: number, days: number): number {
+  const W = 52;
+  switch (period) {
+    case 'annual': return 1;
+    case 'monthly': return 1 / 12;
+    case 'weekly': return 1 / W;
+    case 'daily': return 1 / (W * days);
+    case 'hourly': return 1 / (W * hours);
+  }
+}
+
 export function MainScreen({
   newSalary, setNewSalary, oldSalary, setOldSalary,
   inputPeriod, setInputPeriod, settings, onSettingsChange,
@@ -87,13 +100,17 @@ export function MainScreen({
     return pensionAnnual(annualGross, p.payeEmployerMode, p.payeEmployerValue);
   }
 
-  const totalSacrifice = useMemo(() => {
-    if (!settings.showSacrifice) return 0;
+  const sacrificeParts = useMemo(() => {
+    if (!settings.showSacrifice) return { car: 0, bike: 0, childcare: 0, total: 0 };
     const s = settings.sacrifice;
-    const car = s.car.enabled ? (s.car.mode === 'monthly' ? s.car.value * 12 : s.car.value) : 0;
-    const bike = s.bike.enabled ? (s.bike.mode === 'monthly' ? s.bike.value * 12 : s.bike.value) : 0;
-    return car + bike;
+    const annual = (i: { enabled: boolean; mode: string; value: number }) =>
+      i.enabled ? (i.mode === 'monthly' ? i.value * 12 : i.value) : 0;
+    const car = annual(s.car);
+    const bike = annual(s.bike);
+    const childcare = annual(s.childcare);
+    return { car, bike, childcare, total: car + bike + childcare };
   }, [settings.sacrifice, settings.showSacrifice]);
+  const totalSacrifice = sacrificeParts.total;
 
   const carBiKValue = useMemo(() => {
     if (!settings.showSacrifice) return 0;
@@ -244,6 +261,11 @@ export function MainScreen({
 
   const current = newResult?.[resultPeriod];
   const hasOld = !!oldResult;
+  const pf = periodFactor(resultPeriod, settings.hoursPerWeek, settings.daysPerWeek);
+  // Section totals: pension = workplace + private (what leaves gross pay in the
+  // period); tax = everything HMRC takes (income tax + NI + student loan).
+  const pensionTotal = current ? current.pension.employeeContrib + current.privatePensionPaid : 0;
+  const taxTotal = current ? current.incomeTax + current.nationalInsurance + current.studentLoanRepayment : 0;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -323,7 +345,7 @@ export function MainScreen({
             <View style={styles.toggleRow}>
               <View style={styles.toggleTextWrap}>
                 <Text style={styles.toggleLabel}>Salary sacrifice</Text>
-                <Text style={styles.toggleHint}>Car & cycle-to-work schemes</Text>
+                <Text style={styles.toggleHint}>Car, bike & childcare vouchers</Text>
               </View>
               <Switch
                 value={settings.showSacrifice}
@@ -341,77 +363,96 @@ export function MainScreen({
               <PeriodSelector value={resultPeriod} onChange={setResultPeriod} />
               <View style={styles.divider} />
 
-              <ResultRow label="Gross Salary" value={current.grossSalary} bold={!hasOld} />
+              <ResultRow label="Gross" value={current.grossSalary} bold={!hasOld} />
               {hasOld && (
                 <ResultRow label="Gross Change" value={diff('grossSalary')!} bold />
               )}
 
-              {current.pension.employeeContrib > 0 && (
+              <Text style={styles.groupLabel}>Deductions</Text>
+
+              {pensionTotal > 0 && (
                 <>
-                  <ResultRow label="Pension" value={current.pension.employeeContrib} />
-                  <TouchableOpacity onPress={() => setShowPensionDetail(v => !v)} activeOpacity={0.7}>
-                    <Text style={styles.expandLink}>
-                      {showPensionDetail ? '▲ Hide detail' : '▼ Pension detail'}
-                    </Text>
-                  </TouchableOpacity>
-                  {showPensionDetail && (
-                    <View style={styles.pensionBox}>
-                      <ResultRow
-                        label={`Auto tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
-                        value={current.pension.autoTaxSaving}
-                        indent
-                        dimmed
-                      />
-                      {current.pension.niSaving > 0 && (
-                        <ResultRow label="NI saving (salary sacrifice)" value={current.pension.niSaving} indent dimmed />
+                  <ResultRow label="Pension" value={pensionTotal} />
+                  {current.pension.employeeContrib > 0 && (
+                    <ResultRow label="Workplace Pension" value={current.pension.employeeContrib} indent dimmed />
+                  )}
+                  {current.privatePensionPaid > 0 && (
+                    <ResultRow label="Private Pension" value={current.privatePensionPaid} indent dimmed />
+                  )}
+                  {current.pension.employeeContrib > 0 && (
+                    <>
+                      <TouchableOpacity onPress={() => setShowPensionDetail(v => !v)} activeOpacity={0.7}>
+                        <Text style={styles.expandLink}>
+                          {showPensionDetail ? '▲ Hide detail' : '▼ Pension detail'}
+                        </Text>
+                      </TouchableOpacity>
+                      {showPensionDetail && (
+                        <View style={styles.pensionBox}>
+                          <ResultRow
+                            label={`Auto tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
+                            value={current.pension.autoTaxSaving}
+                            indent
+                            dimmed
+                          />
+                          {current.pension.niSaving > 0 && (
+                            <ResultRow label="NI saving (salary sacrifice)" value={current.pension.niSaving} indent dimmed />
+                          )}
+                          {current.pension.selfAssessmentClaim > 0 && (
+                            <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
+                          )}
+                          <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
+                        </View>
                       )}
-                      {current.pension.selfAssessmentClaim > 0 && (
-                        <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
-                      )}
-                      <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
-                    </View>
+                    </>
                   )}
                 </>
               )}
 
               {current.salarySacrifice > 0 && (
-                <ResultRow label="Salary Sacrifice" value={current.salarySacrifice} />
+                <>
+                  <ResultRow label="Salary Sacrifice" value={current.salarySacrifice} />
+                  {sacrificeParts.car > 0 && (
+                    <ResultRow label="Car" value={sacrificeParts.car * pf} indent dimmed />
+                  )}
+                  {sacrificeParts.bike > 0 && (
+                    <ResultRow label="Bike" value={sacrificeParts.bike * pf} indent dimmed />
+                  )}
+                  {sacrificeParts.childcare > 0 && (
+                    <ResultRow label="Childcare Vouchers" value={sacrificeParts.childcare * pf} indent dimmed />
+                  )}
+                </>
               )}
-              <ResultRow label="Taxable Income" value={current.taxableIncome} />
-              <ResultRow label="Income Tax" value={current.incomeTax} />
+
+              <ResultRow label="Tax" value={taxTotal} />
+              <ResultRow label="Income Tax" value={current.incomeTax} indent dimmed />
               {current.carBiKTax > 0 && (
-                <ResultRow label="of which car BiK tax" value={current.carBiKTax} indent dimmed />
+                <ResultRow label="of which car BiK" value={current.carBiKTax} indent dimmed />
               )}
-              <ResultRow label="National Insurance" value={current.nationalInsurance} />
+              <ResultRow label="National Insurance" value={current.nationalInsurance} indent dimmed />
               {current.studentLoanRepayment > 0 && (
-                <ResultRow label="Student Loan" value={current.studentLoanRepayment} />
+                <ResultRow label="Student Loan" value={current.studentLoanRepayment} indent dimmed />
               )}
 
               <View style={styles.divider} />
               <ResultRow
-                label={hasOld ? 'Take Home Change' : (current.privatePension > 0 ? 'Take Home (payslip)' : 'Take Home')}
+                label={hasOld ? 'Take Home Change' : 'Take Home (Payslip)'}
                 value={hasOld ? diff('takeHome')! : current.takeHome}
                 bold
                 accent
               />
               {current.privatePension > 0 && (
-                <>
-                  <ResultRow
-                    label="Private Pension (you pay)"
-                    value={hasOld ? diff('privatePensionPaid')! : current.privatePensionPaid}
-                  />
-                  <ResultRow
-                    label={hasOld ? 'After Private Pension Change' : 'After Private Pension'}
-                    value={hasOld ? diff('takeHomeAfterPrivate')! : current.takeHomeAfterPrivate}
-                    bold
-                    accent
-                  />
-                </>
+                <ResultRow
+                  label={hasOld ? 'After Private Pension Change' : 'After Private Pension'}
+                  value={hasOld ? diff('takeHomeAfterPrivate')! : current.takeHomeAfterPrivate}
+                  bold
+                  accent
+                />
               )}
 
               {newResult && rates && (
                 <>
                   <View style={styles.divider} />
+                  <Text style={styles.groupLabel}>Tax Rate</Text>
                   {/* ANI is an annual concept (childcare / PA taper thresholds
                       are annual), so it stays annual whatever period is shown */}
                   <ResultRow
@@ -420,11 +461,11 @@ export function MainScreen({
                     dimmed
                   />
                   <View style={styles.rateRow}>
-                    <Text style={styles.rateLabel}>Effective tax rate</Text>
+                    <Text style={styles.rateLabel}>Total</Text>
                     <Text style={styles.rateValue}>{(rates.effective * 100).toFixed(1)}%</Text>
                   </View>
                   <View style={styles.rateRow}>
-                    <Text style={styles.rateLabel}>Tax on next £1 earned</Text>
+                    <Text style={styles.rateLabel}>Next £1</Text>
                     <Text style={styles.rateValue}>{(rates.marginal * 100).toFixed(1)}%</Text>
                   </View>
                 </>
@@ -634,6 +675,14 @@ const styles = StyleSheet.create({
     fontSize: font.sizes.xs,
     color: colors.textSecondary,
     marginTop: 1,
+  },
+  groupLabel: {
+    fontSize: font.sizes.xs,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginTop: spacing.xs,
   },
   rateRow: {
     flexDirection: 'row',

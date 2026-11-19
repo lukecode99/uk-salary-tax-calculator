@@ -24,6 +24,7 @@ export interface CarSchemeSettings extends SacrificeItem {
 export interface SalaryScrificeSettings {
   car: CarSchemeSettings;
   bike: SacrificeItem;
+  childcare: SacrificeItem;
 }
 
 export interface PensionSettings {
@@ -79,6 +80,7 @@ export const DEFAULT_PENSION: PensionSettings = {
 export const DEFAULT_SACRIFICE: SalaryScrificeSettings = {
   car: { enabled: false, mode: 'monthly', value: 0, p11dValue: 0, bikRate: 0 },
   bike: { enabled: false, mode: 'monthly', value: 0 },
+  childcare: { enabled: false, mode: 'monthly', value: 0 },
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
