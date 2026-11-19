@@ -77,45 +77,50 @@ export default function App() {
               inputPeriod={inputPeriod}
               setInputPeriod={setInputPeriod}
               settings={settings}
-            />
-          )}
-        </Tab.Screen>
-
-        <Tab.Screen
-          name="Pension"
-          options={{
-            tabBarLabel: 'Pension',
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={size} color={color} />
-            ),
-          }}
-        >
-          {() => (
-            <PensionScreen
-              annualSalary={annualSalary}
-              settings={settings}
               onSettingsChange={setSettings}
             />
           )}
         </Tab.Screen>
 
-        <Tab.Screen
-          name="Sacrifice"
-          options={{
-            tabBarLabel: 'Sacrifice',
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? 'swap-vertical' : 'swap-vertical-outline'} size={size} color={color} />
-            ),
-          }}
-        >
-          {() => (
-            <SalaryScrificeScreen
-              annualSalary={annualSalary}
-              settings={settings}
-              onSettingsChange={setSettings}
-            />
-          )}
-        </Tab.Screen>
+        {settings.showPension && (
+          <Tab.Screen
+            name="Pension"
+            options={{
+              tabBarLabel: 'Pension',
+              tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons name={focused ? 'wallet' : 'wallet-outline'} size={size} color={color} />
+              ),
+            }}
+          >
+            {() => (
+              <PensionScreen
+                annualSalary={annualSalary}
+                settings={settings}
+                onSettingsChange={setSettings}
+              />
+            )}
+          </Tab.Screen>
+        )}
+
+        {settings.showSacrifice && (
+          <Tab.Screen
+            name="Sacrifice"
+            options={{
+              tabBarLabel: 'Sacrifice',
+              tabBarIcon: ({ focused, color, size }) => (
+                <Ionicons name={focused ? 'swap-vertical' : 'swap-vertical-outline'} size={size} color={color} />
+              ),
+            }}
+          >
+            {() => (
+              <SalaryScrificeScreen
+                annualSalary={annualSalary}
+                settings={settings}
+                onSettingsChange={setSettings}
+              />
+            )}
+          </Tab.Screen>
+        )}
 
         <Tab.Screen
           name="Settings"

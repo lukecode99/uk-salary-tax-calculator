@@ -40,6 +40,10 @@ export interface PensionSettings {
 }
 
 export interface AppSettings {
+  // Progressive disclosure: the Pension / Sacrifice tabs (and their rows in the
+  // calculator) only appear once toggled on from the Calculator page.
+  showPension: boolean;
+  showSacrifice: boolean;
   pension: PensionSettings;
   sacrifice: SalaryScrificeSettings;
   taxYear: TaxYear;
@@ -78,6 +82,8 @@ export const DEFAULT_SACRIFICE: SalaryScrificeSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  showPension: false,
+  showSacrifice: false,
   pension: DEFAULT_PENSION,
   sacrifice: DEFAULT_SACRIFICE,
   taxYear: defaultTaxYear(),

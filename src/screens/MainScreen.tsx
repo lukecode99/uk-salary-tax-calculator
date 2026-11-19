@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import {
-  View, Text, TextInput, ScrollView, StyleSheet,
+  View, Text, TextInput, ScrollView, StyleSheet, Switch,
   TouchableOpacity, SafeAreaView, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from '../ads';
@@ -22,6 +22,7 @@ interface Props {
   inputPeriod: Period;
   setInputPeriod: (p: Period) => void;
   settings: AppSettings;
+  onSettingsChange: (s: AppSettings) => void;
 }
 
 function toAnnual(value: number, period: Period, hours: number, days: number): number {
@@ -43,12 +44,12 @@ function pensionAnnual(grossSalary: number, mode: PensionMode, value: number): n
 
 export function MainScreen({
   newSalary, setNewSalary, oldSalary, setOldSalary,
-  inputPeriod, setInputPeriod, settings,
+  inputPeriod, setInputPeriod, settings, onSettingsChange,
 }: Props) {
   const [resultPeriod, setResultPeriod] = React.useState<Period>('monthly');
   const [focusedField, setFocusedField] = React.useState<string | null>(null);
   const [adStatus, setAdStatus] = React.useState('requested');
-  const [showPension, setShowPension] = React.useState(false);
+  const [showPensionDetail, setShowPensionDetail] = React.useState(false);
   const [showEmployer, setShowEmployer] = React.useState(false);
 
   const newAnnual = useMemo(() => {
@@ -63,15 +64,18 @@ export function MainScreen({
     return toAnnual(v, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek);
   }, [oldSalary, inputPeriod, settings.hoursPerWeek, settings.daysPerWeek]);
 
+  // The Pension / Sacrifice toggles gate both the tabs (App.tsx) and whether
+  // their figures feed the calculation — toggled off, the calculator shows a
+  // plain salary with no pension or sacrifice rows.
   function getPayeContrib(annualGross: number): number {
     const p = settings.pension;
-    if (!p.payeEnabled) return 0;
+    if (!settings.showPension || !p.payeEnabled) return 0;
     return pensionAnnual(annualGross, p.payeEmployeeMode, p.payeEmployeeValue);
   }
 
   function getPrivateContrib(annualGross: number): number {
     const p = settings.pension;
-    if (!p.privateEnabled || p.privateValue === 0) return 0;
+    if (!settings.showPension || !p.privateEnabled || p.privateValue === 0) return 0;
     const entered = pensionAnnual(annualGross, p.privateMode, p.privateValue);
     // Engine wants the gross contribution; gross up if the user entered what they pay ('net').
     return p.privateBasis === 'net' ? entered / 0.8 : entered;
@@ -79,24 +83,39 @@ export function MainScreen({
 
   function getEmployerPension(annualGross: number): number {
     const p = settings.pension;
-    if (!p.payeEnabled) return 0;
+    if (!settings.showPension || !p.payeEnabled) return 0;
     return pensionAnnual(annualGross, p.payeEmployerMode, p.payeEmployerValue);
   }
 
   const totalSacrifice = useMemo(() => {
+    if (!settings.showSacrifice) return 0;
     const s = settings.sacrifice;
     const car = s.car.enabled ? (s.car.mode === 'monthly' ? s.car.value * 12 : s.car.value) : 0;
     const bike = s.bike.enabled ? (s.bike.mode === 'monthly' ? s.bike.value * 12 : s.bike.value) : 0;
     return car + bike;
-  }, [settings.sacrifice]);
+  }, [settings.sacrifice, settings.showSacrifice]);
 
   const carBiKValue = useMemo(() => {
+    if (!settings.showSacrifice) return 0;
     const car = settings.sacrifice.car;
     if (!car.enabled || car.p11dValue <= 0 || car.bikRate <= 0) return 0;
     return car.p11dValue * (car.bikRate / 100);
-  }, [settings.sacrifice.car]);
+  }, [settings.sacrifice.car, settings.showSacrifice]);
 
   const payeViaSacrifice = settings.pension.payeMethod === 'sacrifice';
+
+  function togglePension(on: boolean) {
+    // First switch-on also enables the workplace scheme so the defaults (5% / 3%)
+    // put rows in the results immediately; the Pension tab appears for fine-tuning.
+    const pension = on && !settings.pension.payeEnabled && !settings.pension.privateEnabled
+      ? { ...settings.pension, payeEnabled: true }
+      : settings.pension;
+    onSettingsChange({ ...settings, showPension: on, pension });
+  }
+
+  function toggleSacrifice(on: boolean) {
+    onSettingsChange({ ...settings, showSacrifice: on });
+  }
 
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
@@ -185,6 +204,37 @@ export function MainScreen({
     return { topUp, pct: Math.round((saving / topUp) * 100) };
   }, [newAnnual, settings, totalSacrifice, carBiKValue]);
 
+  // Effective rate = all tax-like deductions (income tax + NI + student loan)
+  // over gross. Marginal = engine delta over an extra £100 earned, which
+  // captures the 60% PA-taper zone, NI step-downs and student loans exactly —
+  // band lookups can't. Rates are period-independent, so annual figures only.
+  const rates = useMemo(() => {
+    if (newAnnual === null || newAnnual <= 0 || !newResult) return null;
+    const deductions = (r: TaxResult) =>
+      r.incomeTax + r.nationalInsurance + r.studentLoanRepayment;
+    const a = newResult.annual;
+    const bumped = calculate({
+      grossSalary: newAnnual + 100,
+      payeContrib: getPayeContrib(newAnnual + 100),
+      privateContrib: getPrivateContrib(newAnnual + 100),
+      totalSalaryScrifice: totalSacrifice,
+      carBiKValue,
+      employerPensionContrib: getEmployerPension(newAnnual + 100),
+      payePensionViaSacrifice: payeViaSacrifice,
+      taxYear: settings.taxYear,
+      scottishRates: settings.scottishRates,
+      studentLoan: settings.studentLoan,
+      payNI: settings.payNI,
+      ageGroup: settings.ageGroup,
+      hoursPerWeek: settings.hoursPerWeek,
+      daysPerWeek: settings.daysPerWeek,
+    });
+    return {
+      effective: deductions(a) / newAnnual,
+      marginal: (deductions(bumped) - deductions(a)) / 100,
+    };
+  }, [newAnnual, newResult, settings, totalSacrifice, carBiKValue, payeViaSacrifice]);
+
   function diff(key: keyof TaxResult): number | null {
     if (!newResult || !oldResult) return null;
     const n = newResult[resultPeriod][key] as number;
@@ -255,6 +305,35 @@ export function MainScreen({
             <PeriodSelector value={inputPeriod} onChange={setInputPeriod} />
           </View>
 
+          {/* Pension / salary-sacrifice toggles — reveal their tabs and feed
+              the relevant rows into the results below */}
+          <View style={styles.card}>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>Pension</Text>
+                <Text style={styles.toggleHint}>Workplace & private contributions</Text>
+              </View>
+              <Switch
+                value={settings.showPension}
+                onValueChange={togglePension}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>Salary sacrifice</Text>
+                <Text style={styles.toggleHint}>Car & cycle-to-work schemes</Text>
+              </View>
+              <Switch
+                value={settings.showSacrifice}
+                onValueChange={toggleSacrifice}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#FFFFFF"
+              />
+            </View>
+          </View>
+
           {/* Results */}
           {current && (
             <View style={styles.card}>
@@ -270,12 +349,12 @@ export function MainScreen({
               {current.pension.employeeContrib > 0 && (
                 <>
                   <ResultRow label="Pension" value={current.pension.employeeContrib} />
-                  <TouchableOpacity onPress={() => setShowPension(v => !v)} activeOpacity={0.7}>
+                  <TouchableOpacity onPress={() => setShowPensionDetail(v => !v)} activeOpacity={0.7}>
                     <Text style={styles.expandLink}>
-                      {showPension ? '▲ Hide detail' : '▼ Pension detail'}
+                      {showPensionDetail ? '▲ Hide detail' : '▼ Pension detail'}
                     </Text>
                   </TouchableOpacity>
-                  {showPension && (
+                  {showPensionDetail && (
                     <View style={styles.pensionBox}>
                       <ResultRow
                         label={`Auto tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
@@ -327,6 +406,27 @@ export function MainScreen({
                     bold
                     accent
                   />
+                </>
+              )}
+
+              {newResult && rates && (
+                <>
+                  <View style={styles.divider} />
+                  {/* ANI is an annual concept (childcare / PA taper thresholds
+                      are annual), so it stays annual whatever period is shown */}
+                  <ResultRow
+                    label="Adjusted Net Income (annual)"
+                    value={newResult.annual.adjustedNetIncome}
+                    dimmed
+                  />
+                  <View style={styles.rateRow}>
+                    <Text style={styles.rateLabel}>Effective tax rate</Text>
+                    <Text style={styles.rateValue}>{(rates.effective * 100).toFixed(1)}%</Text>
+                  </View>
+                  <View style={styles.rateRow}>
+                    <Text style={styles.rateLabel}>Tax on next £1 earned</Text>
+                    <Text style={styles.rateValue}>{(rates.marginal * 100).toFixed(1)}%</Text>
+                  </View>
                 </>
               )}
 
@@ -515,6 +615,43 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  toggleTextWrap: {
+    flex: 1,
+  },
+  toggleLabel: {
+    fontSize: font.sizes.md,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  toggleHint: {
+    fontSize: font.sizes.xs,
+    color: colors.textSecondary,
+    marginTop: 1,
+  },
+  rateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  rateLabel: {
+    fontSize: font.sizes.md,
+    color: colors.text,
+    flex: 1,
+  },
+  rateValue: {
+    fontSize: font.sizes.md,
+    fontWeight: '600',
+    color: colors.text,
+    textAlign: 'right',
+    minWidth: 110,
   },
   saNote: {
     backgroundColor: colors.primaryMuted,
