@@ -454,12 +454,15 @@ export function MainScreen({
                   <View style={styles.divider} />
                   <Text style={styles.groupLabel}>Tax Rate</Text>
                   {/* ANI is an annual concept (childcare / PA taper thresholds
-                      are annual), so it stays annual whatever period is shown */}
-                  <ResultRow
-                    label="Adjusted Net Income (annual)"
-                    value={newResult.annual.adjustedNetIncome}
-                    dimmed
-                  />
+                      are annual), so it only renders on the annual view rather
+                      than being scaled to other periods */}
+                  {resultPeriod === 'annual' && (
+                    <ResultRow
+                      label="Adjusted Net Income"
+                      value={newResult.annual.adjustedNetIncome}
+                      bold
+                    />
+                  )}
                   <View style={styles.rateRow}>
                     <Text style={styles.rateLabel}>Total</Text>
                     <Text style={styles.rateValue}>{(rates.effective * 100).toFixed(1)}%</Text>
