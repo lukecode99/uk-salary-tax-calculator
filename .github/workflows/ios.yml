@@ -3,6 +3,12 @@ name: Build & Deploy iOS to TestFlight
 on:
   workflow_dispatch:
 
+# A newer dispatch supersedes any build still running — cancel it rather
+# than uploading a stale binary and burning a TestFlight slot.
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: macos-26
