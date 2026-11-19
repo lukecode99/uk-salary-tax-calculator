@@ -222,11 +222,26 @@ export function MainScreen({
   }, [newAnnual, settings, totalSacrifice, carBiKValue]);
 
   // Effective rate = all tax-like deductions (income tax + NI + student loan)
-  // over gross. Marginal = engine delta over an extra £100 earned, which
-  // captures the 60% PA-taper zone, NI step-downs and student loans exactly —
-  // band lookups can't. Rates are period-independent, so annual figures only.
+  // over gross, NET of the self-assessment rebate on a relief-at-source private
+  // pension — that rebate is real tax back, so the rates reflect what HMRC
+  // ultimately keeps. Marginal = engine delta over an extra £100 earned, which
+  // captures the 60% PA-taper zone, band extension from the private pension,
+  // NI step-downs and student loans exactly — band lookups can't. Rates are
+  // period-independent, so annual figures only.
   const rates = useMemo(() => {
     if (newAnnual === null || newAnnual <= 0 || !newResult) return null;
+    const saClaimAt = (gross: number): number => {
+      const full = calculateFullPension(
+        gross,
+        getPayeContrib(gross),
+        getEmployerPension(gross),
+        getPrivateContrib(gross),
+        settings.scottishRates,
+        settings.taxYear,
+        { totalSacrifice, carBiKValue, payeViaSacrifice },
+      );
+      return full.privateSaClaim;
+    };
     const deductions = (r: TaxResult) =>
       r.incomeTax + r.nationalInsurance + r.studentLoanRepayment;
     const a = newResult.annual;
@@ -246,9 +261,11 @@ export function MainScreen({
       hoursPerWeek: settings.hoursPerWeek,
       daysPerWeek: settings.daysPerWeek,
     });
+    const netBase = deductions(a) - saClaimAt(newAnnual);
+    const netBumped = deductions(bumped) - saClaimAt(newAnnual + 100);
     return {
-      effective: deductions(a) / newAnnual,
-      marginal: (deductions(bumped) - deductions(a)) / 100,
+      effective: netBase / newAnnual,
+      marginal: (netBumped - netBase) / 100,
     };
   }, [newAnnual, newResult, settings, totalSacrifice, carBiKValue, payeViaSacrifice]);
 
