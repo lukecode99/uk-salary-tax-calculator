@@ -481,6 +481,17 @@ export function MainScreen({
                   accent
                 />
               )}
+              {/* Take-home once the self-assessment refund on the private
+                  pension lands — the claim is annual but shown period-scaled
+                  to match the rest of the card */}
+              {!hasOld && privateSaClaim > 0 && (
+                <ResultRow
+                  label="After Tax Return"
+                  value={current.takeHomeAfterPrivate + privateSaClaim * pf}
+                  bold
+                  accent
+                />
+              )}
 
               {newResult && rates && (
                 <>
