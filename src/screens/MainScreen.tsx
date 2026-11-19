@@ -379,31 +379,64 @@ export function MainScreen({
                   {current.privatePensionPaid > 0 && (
                     <ResultRow label="Private Pension" value={current.privatePensionPaid} indent dimmed />
                   )}
-                  {current.pension.employeeContrib > 0 && (
-                    <>
-                      <TouchableOpacity onPress={() => setShowPensionDetail(v => !v)} activeOpacity={0.7}>
-                        <Text style={styles.expandLink}>
-                          {showPensionDetail ? '▲ Hide detail' : '▼ Pension detail'}
-                        </Text>
-                      </TouchableOpacity>
-                      {showPensionDetail && (
-                        <View style={styles.pensionBox}>
+                  <TouchableOpacity onPress={() => setShowPensionDetail(v => !v)} activeOpacity={0.7}>
+                    <Text style={styles.expandLink}>
+                      {showPensionDetail ? '▲ Hide detail' : '▼ Pension detail'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showPensionDetail && (
+                    <View style={styles.pensionBox}>
+                      {current.pension.employeeContrib > 0 && (
+                        <>
+                          <Text style={styles.groupLabel}>Workplace</Text>
+                          <ResultRow label="Contribution (into pot)" value={current.pension.employeeContrib} indent dimmed />
                           <ResultRow
-                            label={`Auto tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
-                            value={current.pension.autoTaxSaving}
+                            label={`Tax saving (${Math.round((current.pension.autoTaxSaving / current.pension.employeeContrib) * 100)}%)`}
+                            value={-current.pension.autoTaxSaving}
                             indent
                             dimmed
                           />
                           {current.pension.niSaving > 0 && (
-                            <ResultRow label="NI saving (salary sacrifice)" value={current.pension.niSaving} indent dimmed />
+                            <ResultRow label="NI saving (salary sacrifice)" value={-current.pension.niSaving} indent dimmed />
                           )}
                           {current.pension.selfAssessmentClaim > 0 && (
-                            <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
+                            <ResultRow label="Claim via self-assessment" value={-current.pension.selfAssessmentClaim} indent dimmed />
                           )}
-                          <ResultRow label="Net pension cost" value={current.pension.effectiveCost} indent />
-                        </View>
+                          <ResultRow label="Net cost to you" value={current.pension.effectiveCost} indent />
+                        </>
                       )}
-                    </>
+                      {current.privatePension > 0 && (
+                        <>
+                          <Text style={styles.groupLabel}>Private</Text>
+                          <ResultRow label="You pay" value={current.privatePensionPaid} indent dimmed />
+                          <ResultRow
+                            label="Tax relief added to pot"
+                            value={current.privatePension - current.privatePensionPaid}
+                            indent
+                            dimmed
+                          />
+                          {privateSaClaim > 0 && (
+                            <ResultRow label="Claim via self-assessment" value={-privateSaClaim * pf} indent dimmed />
+                          )}
+                          <ResultRow label="Net cost to you" value={current.privatePensionPaid - privateSaClaim * pf} indent />
+                        </>
+                      )}
+                      <Text style={styles.groupLabel}>Total</Text>
+                      {current.employerPension > 0 && (
+                        <ResultRow label="Employer adds" value={current.employerPension} indent dimmed />
+                      )}
+                      <ResultRow
+                        label="Into your pot"
+                        value={current.pension.employeeContrib + current.privatePension + current.employerPension}
+                        indent
+                        dimmed
+                      />
+                      <ResultRow
+                        label="Net pension cost"
+                        value={current.pension.effectiveCost + current.privatePensionPaid - privateSaClaim * pf}
+                        indent
+                      />
+                    </View>
                   )}
                 </>
               )}
