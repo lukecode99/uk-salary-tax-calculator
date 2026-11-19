@@ -6,6 +6,9 @@ export type PensionMode = 'percent' | 'fixed' | 'monthly';
 // their take-home ('net') or the grossed-up total that lands in the pot ('gross').
 export type PensionBasis = 'gross' | 'net';
 export type SacrificeMode = 'fixed' | 'monthly'; // £/yr or £/mo only (no % for sacrifice)
+// How the workplace pension is taken: 'netpay' reduces taxable pay only;
+// 'sacrifice' reduces NI-able pay (and student-loan pay) as well.
+export type PayeMethod = 'netpay' | 'sacrifice';
 
 export interface SacrificeItem {
   enabled: boolean;
@@ -25,6 +28,7 @@ export interface SalaryScrificeSettings {
 
 export interface PensionSettings {
   payeEnabled: boolean;
+  payeMethod?: PayeMethod;   // optional for settings persisted before this field existed
   payeEmployeeMode: PensionMode;
   payeEmployeeValue: number;
   payeEmployerMode: PensionMode;
@@ -57,6 +61,7 @@ export interface AppState {
 
 export const DEFAULT_PENSION: PensionSettings = {
   payeEnabled: false,
+  payeMethod: 'netpay',
   payeEmployeeMode: 'percent',
   payeEmployeeValue: 5,
   payeEmployerMode: 'percent',

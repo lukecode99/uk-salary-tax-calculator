@@ -96,6 +96,8 @@ export function MainScreen({
     return car.p11dValue * (car.bikRate / 100);
   }, [settings.sacrifice.car]);
 
+  const payeViaSacrifice = settings.pension.payeMethod === 'sacrifice';
+
   const newResult = useMemo(() => {
     if (newAnnual === null) return null;
     const annual = calculate({
@@ -105,6 +107,7 @@ export function MainScreen({
       totalSalaryScrifice: totalSacrifice,
       carBiKValue,
       employerPensionContrib: getEmployerPension(newAnnual),
+      payePensionViaSacrifice: payeViaSacrifice,
       taxYear: settings.taxYear,
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
@@ -125,6 +128,7 @@ export function MainScreen({
       totalSalaryScrifice: totalSacrifice,
       carBiKValue,
       employerPensionContrib: getEmployerPension(oldAnnual),
+      payePensionViaSacrifice: payeViaSacrifice,
       taxYear: settings.taxYear,
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
@@ -144,9 +148,13 @@ export function MainScreen({
     const privateGross = p.privateBasis === 'net' ? entered / 0.8 : entered;
     const payeEmp = getPayeContrib(newAnnual);
     const payeEmpR = p.payeEnabled ? pensionAnnual(newAnnual, p.payeEmployerMode, p.payeEmployerValue) : 0;
-    const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates, settings.taxYear);
+    const full = calculateFullPension(newAnnual, payeEmp, payeEmpR, privateGross, settings.scottishRates, settings.taxYear, {
+      totalSacrifice,
+      carBiKValue,
+      payeViaSacrifice,
+    });
     return full.privateSaClaim;
-  }, [newAnnual, settings]);
+  }, [newAnnual, settings, totalSacrifice, carBiKValue, payeViaSacrifice]);
 
   // PA-restore optimiser (ST-7): adjusted net income between £100k and
   // £125,140 sits in the 60% taper zone — an extra contribution of
@@ -154,7 +162,7 @@ export function MainScreen({
   const paRestoreHint = useMemo(() => {
     if (newAnnual === null) return null;
     const payeContrib = getPayeContrib(newAnnual);
-    const adjusted = newAnnual - payeContrib - totalSacrifice + carBiKValue;
+    const adjusted = newAnnual - payeContrib - totalSacrifice + carBiKValue - getPrivateContrib(newAnnual);
     if (adjusted <= 100000 || adjusted > 125140) return null;
     const topUp = adjusted - 100000;
     const base = {
@@ -162,6 +170,7 @@ export function MainScreen({
       payeContrib,
       totalSalaryScrifice: totalSacrifice,
       carBiKValue,
+      payePensionViaSacrifice: payeViaSacrifice,
       taxYear: settings.taxYear,
       scottishRates: settings.scottishRates,
       studentLoan: settings.studentLoan,
@@ -274,6 +283,9 @@ export function MainScreen({
                         indent
                         dimmed
                       />
+                      {current.pension.niSaving > 0 && (
+                        <ResultRow label="NI saving (salary sacrifice)" value={current.pension.niSaving} indent dimmed />
+                      )}
                       {current.pension.selfAssessmentClaim > 0 && (
                         <ResultRow label="Claim via self-assessment" value={current.pension.selfAssessmentClaim} indent dimmed />
                       )}
@@ -298,11 +310,25 @@ export function MainScreen({
 
               <View style={styles.divider} />
               <ResultRow
-                label={hasOld ? 'Take Home Change' : 'Take Home'}
+                label={hasOld ? 'Take Home Change' : (current.privatePension > 0 ? 'Take Home (payslip)' : 'Take Home')}
                 value={hasOld ? diff('takeHome')! : current.takeHome}
                 bold
                 accent
               />
+              {current.privatePension > 0 && (
+                <>
+                  <ResultRow
+                    label="Private Pension (you pay)"
+                    value={hasOld ? diff('privatePensionPaid')! : current.privatePensionPaid}
+                  />
+                  <ResultRow
+                    label={hasOld ? 'After Private Pension Change' : 'After Private Pension'}
+                    value={hasOld ? diff('takeHomeAfterPrivate')! : current.takeHomeAfterPrivate}
+                    bold
+                    accent
+                  />
+                </>
+              )}
 
               {privateSaClaim > 0 && (
                 <View style={styles.saNote}>

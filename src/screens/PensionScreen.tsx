@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { calculateFullPension, FullPensionResult, Period, calculateAni } from '../engine/taxEngine';
-import { AppSettings, PensionSettings, PensionMode, PensionBasis } from '../types';
+import { AppSettings, PensionSettings, PensionMode, PensionBasis, PayeMethod } from '../types';
 import { colors, spacing, radius, font } from '../theme';
 
 interface Props {
@@ -66,6 +66,27 @@ function BasisToggle({ basis, onChange }: { basis: PensionBasis; onChange: (b: P
           activeOpacity={0.8}
         >
           <Text style={[basisTog.label, basis === o.key && basisTog.labelActive]}>{o.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+
+function MethodToggle({ method, onChange }: { method: PayeMethod; onChange: (m: PayeMethod) => void }) {
+  const opts: { key: PayeMethod; label: string }[] = [
+    { key: 'netpay', label: 'Net pay' },
+    { key: 'sacrifice', label: 'Salary sacrifice' },
+  ];
+  return (
+    <View style={basisTog.container}>
+      {opts.map((o) => (
+        <TouchableOpacity
+          key={o.key}
+          style={[basisTog.btn, method === o.key && basisTog.btnActive]}
+          onPress={() => onChange(o.key)}
+          activeOpacity={0.8}
+        >
+          <Text style={[basisTog.label, method === o.key && basisTog.labelActive]}>{o.label}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -134,10 +155,21 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
   const payeEmployee = p.payeEnabled ? resolve(p.payeEmployeeMode, p.payeEmployeeValue) : 0;
   const payeEmployer = p.payeEnabled ? resolve(p.payeEmployerMode, p.payeEmployerValue) : 0;
+  const payeViaSacrifice = (p.payeMethod ?? 'netpay') === 'sacrifice';
   const privateEntered = p.privateEnabled ? resolve(p.privateMode, p.privateValue) : 0;
   // The engine expects a gross contribution. If the user entered what leaves
   // their take-home ('net'), gross it up by basic-rate relief (net / 0.8).
   const privateGross = p.privateBasis === 'net' ? privateEntered / 0.8 : privateEntered;
+
+  // Salary-sacrifice schemes (car/bike) from the Sacrifice tab — they reduce the
+  // taxable salary this screen's relief maths runs against, and a car adds BiK.
+  const sac = settings.sacrifice;
+  const resolveSac = (item: { enabled: boolean; mode: 'fixed' | 'monthly'; value: number }) =>
+    item.enabled ? (item.mode === 'monthly' ? item.value * 12 : item.value) : 0;
+  const totalSacrifice = resolveSac(sac.car) + resolveSac(sac.bike);
+  const carBiKValue = sac.car.enabled && sac.car.p11dValue > 0 && sac.car.bikRate > 0
+    ? sac.car.p11dValue * (sac.car.bikRate / 100)
+    : 0;
 
   const result: FullPensionResult | null = useMemo(() => {
     if (annualSalary <= 0) return null;
@@ -148,18 +180,19 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
       privateGross,
       settings.scottishRates,
       settings.taxYear,
+      { totalSacrifice, carBiKValue, payeViaSacrifice },
     );
-  }, [annualSalary, payeEmployee, payeEmployer, privateGross, settings.scottishRates, settings.taxYear]);
+  }, [annualSalary, payeEmployee, payeEmployer, privateGross, settings.scottishRates, settings.taxYear, totalSacrifice, carBiKValue, payeViaSacrifice]);
 
   const hasSalary = annualSalary > 0;
   const hasSaClaim = result && (result.privateSaClaim > 0 || result.payeSaClaim > 0);
 
-  // Adjusted net income for the £100k childcare cliff-edge. The pension that
-  // reduces ANI = workplace (net-pay) employee contributions + the gross of the
-  // relief-at-source private contribution.
+  // Adjusted net income for the £100k childcare cliff-edge. Deductions = workplace
+  // employee contributions + gross relief-at-source private contribution + salary
+  // sacrifice; a car scheme's BiK value adds back on top.
   const ani = useMemo(
-    () => calculateAni(annualSalary, payeEmployee + privateGross),
-    [annualSalary, payeEmployee, privateGross],
+    () => calculateAni(annualSalary, payeEmployee + privateGross + totalSacrifice, carBiKValue),
+    [annualSalary, payeEmployee, privateGross, totalSacrifice, carBiKValue],
   );
 
   return (
@@ -188,6 +221,19 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
 
           {p.payeEnabled && (
             <>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputGroupLabel}>How it's taken</Text>
+                <MethodToggle
+                  method={p.payeMethod ?? 'netpay'}
+                  onChange={(m) => updatePension({ payeMethod: m })}
+                />
+                <Text style={styles.basisNote}>
+                  {payeViaSacrifice
+                    ? 'Salary sacrifice: contribution comes off pay before tax AND National Insurance.'
+                    : 'Net pay: contribution comes off pay before tax (but not NI).'}
+                </Text>
+              </View>
+
               <View style={styles.inputGroup}>
                 <Text style={styles.inputGroupLabel}>Your contribution</Text>
                 <ModeToggle mode={p.payeEmployeeMode} onChange={(m) => updatePension({ payeEmployeeMode: m })} />
@@ -293,7 +339,8 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
               {formatGBP(ani.adjustedNetIncome)}
             </Text>
             <Text style={styles.aniWorking}>
-              {formatGBP(ani.grossSalary)} salary − {formatGBP(ani.pensionDeduction)} pension
+              {formatGBP(ani.grossSalary)} salary − {formatGBP(ani.pensionDeduction)} pension/sacrifice
+              {ani.biKValue > 0 ? ` + ${formatGBP(ani.biKValue)} car benefit` : ''}
             </Text>
 
             {!ani.isOver ? (
@@ -316,7 +363,7 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
             )}
 
             <Text style={styles.aniNote}>
-              Salary-only estimate from the two pension figures above. Real ANI also adds taxable benefits, savings interest, dividends and rental profit, and subtracts Gift Aid (grossed up ÷0.8).
+              Estimate from salary, the pension figures above, salary sacrifice and any car benefit-in-kind. Real ANI also adds savings interest, dividends and rental profit, and subtracts Gift Aid (grossed up ÷0.8).
             </Text>
           </View>
         )}
@@ -341,6 +388,9 @@ export function PensionScreen({ annualSalary, settings, onSettingsChange }: Prop
             <View style={styles.summaryDivider} />
             {result.payeAutoSaving > 0 && (
               <ResultLine label="Income tax saved (PAYE)" value={result.payeAutoSaving} dimmed />
+            )}
+            {result.payeNiSaving > 0 && (
+              <ResultLine label="NI saved (salary sacrifice)" value={result.payeNiSaving} dimmed />
             )}
             {result.privateBasicRelief > 0 && (
               <ResultLine label="HMRC basic relief (private)" value={result.privateBasicRelief} dimmed />

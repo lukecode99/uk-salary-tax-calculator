@@ -491,4 +491,103 @@ describe('calculateAni (childcare £100k cliff-edge)', () => {
     const r = calculateAni(20000, 50000);
     expect(r.adjustedNetIncome).toBe(0);
   });
+
+  test('BiK adds to ANI', () => {
+    const r = calculateAni(98000, 0, 5000);
+    expect(r.adjustedNetIncome).toBe(103000);
+    expect(r.isOver).toBe(true);
+    expect(r.biKValue).toBe(5000);
+  });
+});
+
+// ─── Precision audit fixes (Nov 2026) ──────────────────────────────────────
+describe('RAS self-assessment claim — delta method', () => {
+  test('£110k + £8k gross RAS → SA claim £3,200 (captures the 60% taper zone)', () => {
+    const res = calculateFullPension(110000, 0, 0, 8000, false, '2026/27');
+    // tax(110,000) = 33,432 (PA tapered to 7,570); tax(102,000) = 28,632 (PA 11,570)
+    // delta 4,800 − 1,600 claimed at source = 3,200. A flat 20% top-up gives only 1,600.
+    expect(r2(res.privateSaClaim)).toBe(3200.00);
+  });
+
+  test('higher-rate payer outside the taper zone still gets flat 20% extra', () => {
+    const res = calculateFullPension(80000, 0, 0, 2000, false, '2026/27');
+    expect(r2(res.privateSaClaim)).toBe(400.00);
+  });
+});
+
+describe('Scotland — Top rate starts at £125,140 of TAXABLE income', () => {
+  test('£130k 2026/27 → £50,034.35', () => {
+    const res = calculate({ ...base, grossSalary: 130000, scottishRates: true });
+    // PA fully withdrawn → taxable = 130,000. Fixed taxable-income spans:
+    // 3,967×19% + 12,989×20% + 14,136×21% + 31,338×42% + 62,710×45% + 4,860×48%
+    expect(r2(res.incomeTax)).toBeCloseTo(50034.35, 2);
+  });
+});
+
+describe('Workplace pension via salary sacrifice', () => {
+  test('£60k with £3k sacrificed → employee NI saving £60', () => {
+    const net = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, payePensionViaSacrifice: false });
+    const sac = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, payePensionViaSacrifice: true });
+    expect(r2(net.nationalInsurance)).toBe(3210.60);
+    expect(r2(sac.nationalInsurance)).toBe(3150.60);
+    expect(r2(sac.pension.niSaving)).toBe(60.00);
+    expect(net.pension.niSaving).toBe(0);
+  });
+
+  test('sacrifice method also reduces student-loan pay (9% × contribution)', () => {
+    const net = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, studentLoan: 'plan2', payePensionViaSacrifice: false });
+    const sac = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, studentLoan: 'plan2', payePensionViaSacrifice: true });
+    expect(r2(net.studentLoanRepayment - sac.studentLoanRepayment)).toBe(270.00);
+  });
+
+  test('sacrifice method reduces employer NI (15% × contribution)', () => {
+    const net = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, payePensionViaSacrifice: false });
+    const sac = calculate({ ...base, grossSalary: 60000, payeContrib: 3000, payePensionViaSacrifice: true });
+    expect(r2(net.employerNI - sac.employerNI)).toBe(450.00);
+  });
+
+  test('net-pay method does NOT reduce NI (unchanged behaviour)', () => {
+    const none = calculate({ ...base, grossSalary: 60000 });
+    const net = calculate({ ...base, grossSalary: 60000, payeContrib: 3000 });
+    expect(r2(net.nationalInsurance)).toBe(r2(none.nationalInsurance));
+  });
+});
+
+describe('Employer Class 1A NI on benefits in kind', () => {
+  test('£5,000 BiK adds £750 employer NI, no change to employee NI', () => {
+    const noBik = calculate({ ...base, grossSalary: 50000 });
+    const withBik = calculate({ ...base, grossSalary: 50000, carBiKValue: 5000 });
+    expect(r2(withBik.employerNI - noBik.employerNI)).toBe(750.00);
+    expect(r2(withBik.nationalInsurance)).toBe(r2(noBik.nationalInsurance));
+  });
+});
+
+describe('Private pension visible in take-home', () => {
+  test('privatePensionPaid = 80% of gross; takeHomeAfterPrivate = takeHome − paid', () => {
+    const res = calculate({ ...base, grossSalary: 80000, privateContrib: 10000 });
+    const noPriv = calculate({ ...base, grossSalary: 80000 });
+    expect(r2(res.privatePensionPaid)).toBe(8000.00);
+    expect(r2(res.takeHomeAfterPrivate)).toBe(r2(res.takeHome - 8000));
+    // a relief-at-source pension never changes the payslip take-home itself
+    expect(r2(res.takeHome)).toBe(r2(noPriv.takeHome));
+  });
+});
+
+describe('Adjusted net income in calculate()', () => {
+  test('ANI = gross − paye − sacrifice + BiK − private gross', () => {
+    const res = calculate({
+      ...base, grossSalary: 120000, payeContrib: 5000, privateContrib: 5000,
+      totalSalaryScrifice: 2000, carBiKValue: 3000,
+    });
+    expect(res.adjustedNetIncome).toBe(111000);
+  });
+});
+
+describe('England £134k acceptance figures', () => {
+  test('tax £46,503.00, NI £4,690.60, take-home £82,806.40', () => {
+    const res = calculate({ ...base, grossSalary: 134000 });
+    expect(r2(res.incomeTax)).toBe(46503.00);
+    expect(r2(res.nationalInsurance)).toBe(4690.60);
+    expect(r2(res.takeHome)).toBe(82806.40);
+  });
 });
